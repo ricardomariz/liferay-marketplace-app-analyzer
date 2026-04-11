@@ -1,0 +1,7 @@
+{
+  "name": "@lma/shared",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

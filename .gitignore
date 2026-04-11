@@ -1,0 +1,12 @@
+node_modules
+bun.lock
+.env
+.env.*
+.DS_Store
+dist
+build
+coverage
+*.log
+tmp
+uploads
+apps/api/data
