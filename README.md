@@ -1,34 +1,34 @@
 # Liferay Marketplace App Analyzer
 
-Ferramenta para validar deploy de artifacts `.jar` e `.war` em Liferay DXP via Docker, com interface web para upload, acompanhamento em tempo real e histórico de testes.
+Tool to validate `.jar` and `.war` artifact deployment on Liferay DXP via Docker, with a web UI for upload, real-time monitoring, and test history.
 
 ## Quick Setup
 
-### 1. Pré-requisitos
+### 1. Prerequisites
 
 - Bun 1.3+
-- Docker instalado e em execução
+- Docker installed and running
 
-### 2. Instalar dependências
+### 2. Install dependencies
 
 ```bash
 cd /home/me/dev/projects/liferay-marketplace-app-analyzer
 bun install
 ```
 
-### 3. Configurar frontend
+### 3. Configure frontend
 
 ```bash
 cp apps/web/.env.example apps/web/.env
 ```
 
-Valor padrão esperado em `apps/web/.env`:
+Expected default value in `apps/web/.env`:
 
 ```env
 VITE_API_URL=http://localhost:3001
 ```
 
-### 4. Subir API e Web (2 terminais)
+### 4. Start API and Web (2 terminals)
 
 Terminal A (API):
 
@@ -44,26 +44,26 @@ cd /home/me/dev/projects/liferay-marketplace-app-analyzer
 bun run dev:web
 ```
 
-### 5. Acessar
+### 5. Access
 
 - Frontend: http://localhost:5173
 - API health: http://localhost:3001/api/health
 
 ---
 
-## Setup Detalhado
+## Detailed Setup
 
-### Estrutura do projeto
+### Project structure
 
 ```text
 apps/
-  api/   # Backend Bun + Hono (upload, fila, SSE, execução Docker)
+  api/   # Bun + Hono backend (upload, queue, SSE, Docker execution)
   web/   # Frontend React + Vite
 packages/
-  shared/ # Tipos compartilhados
+  shared/ # Shared types
 ```
 
-### Scripts disponíveis
+### Available scripts
 
 No root:
 
@@ -90,29 +90,30 @@ bun run build
 bun run preview
 ```
 
-### Como usar a aplicação
+### How to use the application
 
 1. Abra o frontend em `http://localhost:5173`.
-2. Selecione a versão do Liferay.
-3. Faça upload do arquivo `.jar` ou `.war`.
-4. Inicie o teste.
-5. Acompanhe status/fase em tempo real.
-6. Abra os detalhes do teste para ver:
-   - resumo
-   - logs
-   - motivo provável de falha
-   - sugestões de correção
+2. Select the Liferay version.
+3. Upload a `.jar` or `.war` file.
+4. Start the test.
+5. Monitor status/phase in real time.
+6. Open test details to see:
 
-### Filtros do histórico
+- summary
+- logs
+- likely failure reason
+- suggested fixes
 
-No histórico você pode filtrar por:
+### History filters
 
-- nome do arquivo
+In the history page, you can filter by:
+
+- file name
 - status (`queued`, `running`, `success`, `failed`, `error`)
-- data inicial
-- data final
+- start date
+- end date
 
-### Endpoints principais (API)
+### Main endpoints (API)
 
 - `GET /api/health`
 - `GET /api/versions`
@@ -125,36 +126,36 @@ No histórico você pode filtrar por:
 
 ## Troubleshooting
 
-### Docker indisponível
+### Docker unavailable
 
-Sintoma: testes falham com mensagem de daemon Docker indisponível.
+Symptom: tests fail with a Docker daemon unavailable message.
 
 Checklist:
 
-- confirme que o Docker está rodando
-- confirme permissão do usuário para usar Docker
-- em Linux, valide com:
+- confirm Docker is running
+- confirm your user has permission to use Docker
+- on Linux, validate with:
 
 ```bash
 docker ps
 ```
 
-### Porta em uso
+### Port already in use
 
-Se `3001` ou `5173` estiverem ocupadas:
+If `3001` or `5173` is already in use:
 
-- API: defina `PORT` antes de subir a API
-- Web: ajuste porta no Vite (`apps/web/vite.config.ts`)
+- API: set `PORT` before starting the API
+- Web: change the Vite port (`apps/web/vite.config.ts`)
 
-### Frontend sem conectar na API
+### Frontend cannot reach API
 
-- valide `apps/web/.env`
-- confirme API ativa em `http://localhost:3001/api/health`
+- validate `apps/web/.env`
+- confirm API is running at `http://localhost:3001/api/health`
 
 ---
 
-## Observações
+## Notes
 
-- O sistema roda 1 teste por vez (fila em memória).
-- O histórico atualmente é associado ao usuário fixo `dev-user`.
-- Para persistência entre reinícios, o próximo passo recomendado é salvar `test_runs` em SQLite.
+- The system runs 1 test at a time (in-memory queue).
+- History is currently associated with a fixed user `dev-user`.
+- For persistence across restarts, the recommended next step is saving `test_runs` in SQLite.

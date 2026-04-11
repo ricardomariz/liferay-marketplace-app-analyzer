@@ -42,7 +42,9 @@ function findFailureReason(record: TestRunRecord | undefined) {
 
   const matchedLogLine = record.logs.find((line) => failurePattern.test(line));
 
-  return matchedLogLine ?? record.resultSummary ?? "Falha sem detalhe de log.";
+  return (
+    matchedLogLine ?? record.resultSummary ?? "Failure without detailed logs."
+  );
 }
 
 type FailureAnalysis = {
@@ -63,7 +65,7 @@ function analyzeFailure(
     return null;
   }
 
-  const reason = findFailureReason(record) ?? "Falha sem detalhe de log.";
+  const reason = findFailureReason(record) ?? "Failure without detailed logs.";
   const reasonLower = reason.toLowerCase();
 
   if (
@@ -73,12 +75,12 @@ function analyzeFailure(
   ) {
     return {
       severity: "high",
-      category: "Dependências OSGi não resolvidas",
+      category: "Unresolved OSGi dependencies",
       reason,
       suggestions: [
-        "Verifique se o módulo exporta/importa os pacotes corretos no MANIFEST.MF.",
-        "Confirme se as dependências exigidas existem na versão DXP escolhida.",
-        "Revise a versão de compilação do app e as versões dos bundles dependentes.",
+        "Check whether the module exports/imports the correct packages in MANIFEST.MF.",
+        "Confirm that required dependencies exist in the selected DXP version.",
+        "Review the app build version and dependent bundle versions.",
       ],
     };
   }
@@ -86,12 +88,12 @@ function analyzeFailure(
   if (/classnotfoundexception/.test(reasonLower)) {
     return {
       severity: "high",
-      category: "Classe ausente em runtime",
+      category: "Missing class at runtime",
       reason,
       suggestions: [
-        "Inclua a dependência faltante no empacotamento correto do módulo.",
-        "Evite dependência de classe de pacote não disponível no target DXP.",
-        "Valide se houve mudança de API entre versões do Liferay.",
+        "Include the missing dependency in the correct module packaging.",
+        "Avoid depending on package classes not available in the target DXP.",
+        "Validate whether there was an API change between Liferay versions.",
       ],
     };
   }
@@ -103,12 +105,12 @@ function analyzeFailure(
   ) {
     return {
       severity: "medium",
-      category: "Infraestrutura/ambiente",
+      category: "Infrastructure/environment",
       reason,
       suggestions: [
-        "Confirme se o Docker está ativo e acessível pelo backend.",
-        "Aumente timeout de startup para versões mais pesadas do DXP.",
-        "Verifique recursos da máquina (RAM/CPU/disco) durante a execução.",
+        "Confirm Docker is running and reachable by the backend.",
+        "Increase startup timeout for heavier DXP versions.",
+        "Check machine resources (RAM/CPU/disk) during execution.",
       ],
     };
   }
@@ -116,24 +118,24 @@ function analyzeFailure(
   if (/failed to deploy/.test(reasonLower)) {
     return {
       severity: "medium",
-      category: "Erro genérico de deploy",
+      category: "Generic deployment error",
       reason,
       suggestions: [
-        "Revise logs completos para identificar classe/pacote que iniciou a falha.",
-        "Teste o mesmo artifact em outra versão DXP para comparar compatibilidade.",
-        "Valide se o arquivo enviado (.jar/.war) é o build final correto.",
+        "Review full logs to identify the class/package that triggered the failure.",
+        "Test the same artifact on another DXP version to compare compatibility.",
+        "Validate that the uploaded file (.jar/.war) is the correct final build.",
       ],
     };
   }
 
   return {
     severity: "low",
-    category: "Falha não categorizada",
+    category: "Uncategorized failure",
     reason,
     suggestions: [
-      "Analise as últimas linhas dos logs para identificar o primeiro erro real.",
-      "Repita o teste com logs debug habilitados no app para mais contexto.",
-      "Valide versão do Java e compatibilidade do artifact com o DXP escolhido.",
+      "Analyze the last log lines to identify the first real error.",
+      "Repeat the test with debug logs enabled for more context.",
+      "Validate Java version and artifact compatibility with the selected DXP.",
     ],
   };
 }
@@ -275,10 +277,10 @@ function HomePage() {
     !!historyStatus;
 
   const activeFilterChips = [
-    historyFileName ? `Arquivo: ${historyFileName}` : null,
+    historyFileName ? `File: ${historyFileName}` : null,
     historyStatus ? `Status: ${historyStatus}` : null,
-    historyCreatedFrom ? `De: ${historyCreatedFrom}` : null,
-    historyCreatedTo ? `Até: ${historyCreatedTo}` : null,
+    historyCreatedFrom ? `From: ${historyCreatedFrom}` : null,
+    historyCreatedTo ? `To: ${historyCreatedTo}` : null,
   ].filter(Boolean) as string[];
 
   const handleSubmit = async () => {
@@ -308,10 +310,12 @@ function HomePage() {
     <main className="page">
       <section className="card">
         <h1>Liferay App Analyzer</h1>
-        <p>Upload de .jar/.war com seleção de versão DXP e execução em fila.</p>
+        <p>
+          Upload .jar/.war files, select a DXP version, and run tests in queue.
+        </p>
 
         <div className="field">
-          <label htmlFor="version">Versão Liferay</label>
+          <label htmlFor="version">Liferay Version</label>
           <select
             id="version"
             value={selectedVersion}
@@ -320,7 +324,7 @@ function HomePage() {
               setSelectedDockerTag("");
             }}
           >
-            <option value="">Selecione uma versão</option>
+            <option value="">Select a version</option>
             {versionsQuery.data?.map((version) => (
               <option key={version.key} value={version.key}>
                 {version.label} ({version.dockerTag})
@@ -330,7 +334,7 @@ function HomePage() {
         </div>
 
         <div className="field">
-          <label htmlFor="docker-tag">Tag Docker (opcional)</label>
+          <label htmlFor="docker-tag">Docker Tag (optional)</label>
           <select
             id="docker-tag"
             value={selectedDockerTag}
@@ -338,7 +342,7 @@ function HomePage() {
             disabled={!selectedVersion || dockerTagsQuery.isLoading}
           >
             <option value="">
-              Automático ({selectedVersionOption?.dockerTag ?? "tag da versão"})
+              Automatic ({selectedVersionOption?.dockerTag ?? "version tag"})
             </option>
             {filteredDockerTagOptions.map((tag) => (
               <option key={tag.name} value={tag.name}>
@@ -347,12 +351,12 @@ function HomePage() {
             ))}
           </select>
           {dockerTagsQuery.isError ? (
-            <small>Não foi possível carregar tags do Docker Hub agora.</small>
+            <small>Could not load Docker Hub tags right now.</small>
           ) : null}
         </div>
 
         <div className="field">
-          <label htmlFor="file">Arquivo</label>
+          <label htmlFor="file">File</label>
           <input
             id="file"
             type="file"
@@ -364,9 +368,7 @@ function HomePage() {
         </div>
 
         <button type="button" disabled={!canSubmit} onClick={handleSubmit}>
-          {createTestRunMutation.isPending
-            ? "Enfileirando..."
-            : "Iniciar teste"}
+          {createTestRunMutation.isPending ? "Queueing..." : "Start test"}
         </button>
 
         <label className="checkbox-inline" htmlFor="keep-alive">
@@ -376,20 +378,20 @@ function HomePage() {
             checked={keepAlive}
             onChange={(event) => setKeepAlive(event.target.checked)}
           />
-          Keep alive (não matar container ao fim do teste)
+          Keep alive (do not stop container at the end of the test)
         </label>
 
-        {selectedFile ? <p>Arquivo selecionado: {selectedFile.name}</p> : null}
+        {selectedFile ? <p>Selected file: {selectedFile.name}</p> : null}
 
-        {versionsQuery.isLoading ? <p>Carregando versões...</p> : null}
-        {versionsQuery.isError ? <p>Erro ao buscar versões da API.</p> : null}
-        {createTestRunMutation.isError ? (
-          <p>Erro ao enfileirar teste.</p>
+        {versionsQuery.isLoading ? <p>Loading versions...</p> : null}
+        {versionsQuery.isError ? (
+          <p>Failed to fetch versions from API.</p>
         ) : null}
+        {createTestRunMutation.isError ? <p>Failed to queue test.</p> : null}
 
         {testRunQuery.data ? (
           <section className="result-box">
-            <h2>Resultado do teste atual</h2>
+            <h2>Current test result</h2>
             <p>
               <strong>ID:</strong> {testRunQuery.data.id}
             </p>
@@ -397,11 +399,11 @@ function HomePage() {
               <strong>Status:</strong> {testRunQuery.data.status}
             </p>
             <p>
-              <strong>Fase:</strong> {testRunQuery.data.phase}
+              <strong>Phase:</strong> {testRunQuery.data.phase}
             </p>
             <p>
-              <strong>Resumo:</strong>{" "}
-              {testRunQuery.data.resultSummary ?? "Processando..."}
+              <strong>Summary:</strong>{" "}
+              {testRunQuery.data.resultSummary ?? "Processing..."}
             </p>
             {testRunQuery.data.mappedPort ? (
               <p>
@@ -412,7 +414,7 @@ function HomePage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Abrir Liferay em localhost:{testRunQuery.data.mappedPort}
+                  Open Liferay at localhost:{testRunQuery.data.mappedPort}
                 </a>
               </p>
             ) : null}
@@ -420,18 +422,18 @@ function HomePage() {
               className="details-link"
               to={`/test-runs/${testRunQuery.data.id}`}
             >
-              Ver detalhes do teste
+              View test details
             </Link>
           </section>
         ) : null}
 
         <section className="result-box">
-          <h2>Containers ativos (keep alive)</h2>
+          <h2>Active containers (keep alive)</h2>
           {activeContainersQuery.isLoading ? (
-            <p>Carregando containers ativos...</p>
+            <p>Loading active containers...</p>
           ) : null}
           {activeContainersQuery.isError ? (
-            <p>Erro ao listar containers ativos.</p>
+            <p>Failed to list active containers.</p>
           ) : null}
           {!activeContainersQuery.isLoading &&
           !activeContainersQuery.isError ? (
@@ -440,10 +442,10 @@ function HomePage() {
                 {activeContainersQuery.data.items.map((item) => (
                   <article key={item.id} className="history-item">
                     <p>
-                      <strong>Teste:</strong> {item.id}
+                      <strong>Test run:</strong> {item.id}
                     </p>
                     <p>
-                      <strong>Arquivo:</strong> {item.fileName}
+                      <strong>File:</strong> {item.fileName}
                     </p>
                     <p>
                       <strong>Container:</strong> {item.containerId ?? "N/A"}
@@ -464,27 +466,27 @@ function HomePage() {
                       )}
                     </p>
                     <Link className="details-link" to={`/test-runs/${item.id}`}>
-                      Gerenciar teste
+                      Manage test
                     </Link>
                   </article>
                 ))}
               </div>
             ) : (
-              <p>Nenhum container ativo no momento.</p>
+              <p>No active containers at the moment.</p>
             )
           ) : null}
         </section>
 
         <section className="result-box">
           <div className="section-title-row">
-            <h2>Historico de testes</h2>
+            <h2>Test history</h2>
             <button
               type="button"
               className="button-secondary"
               onClick={clearHistoryFilters}
               disabled={!hasActiveHistoryFilters}
             >
-              Limpar filtros
+              Clear filters
             </button>
           </div>
 
@@ -500,11 +502,11 @@ function HomePage() {
 
           <div className="history-filters">
             <div className="field">
-              <label htmlFor="history-file-name">Nome do arquivo</label>
+              <label htmlFor="history-file-name">File name</label>
               <input
                 id="history-file-name"
                 type="text"
-                placeholder="ex: meu-app"
+                placeholder="e.g. my-app"
                 value={historyFileName}
                 onChange={(event) => setHistoryFileName(event.target.value)}
               />
@@ -527,7 +529,7 @@ function HomePage() {
                   )
                 }
               >
-                <option value="">Todos</option>
+                <option value="">All</option>
                 {STATUS_OPTIONS.map((status) => (
                   <option key={status} value={status}>
                     {status}
@@ -537,7 +539,7 @@ function HomePage() {
             </div>
 
             <div className="field">
-              <label htmlFor="history-created-from">Data inicial</label>
+              <label htmlFor="history-created-from">Start date</label>
               <input
                 id="history-created-from"
                 type="date"
@@ -547,7 +549,7 @@ function HomePage() {
             </div>
 
             <div className="field">
-              <label htmlFor="history-created-to">Data final</label>
+              <label htmlFor="history-created-to">End date</label>
               <input
                 id="history-created-to"
                 type="date"
@@ -557,8 +559,8 @@ function HomePage() {
             </div>
           </div>
 
-          {historyQuery.isLoading ? <p>Carregando historico...</p> : null}
-          {historyQuery.isError ? <p>Erro ao carregar historico.</p> : null}
+          {historyQuery.isLoading ? <p>Loading history...</p> : null}
+          {historyQuery.isError ? <p>Failed to load history.</p> : null}
 
           {!historyQuery.isLoading && !historyQuery.isError ? (
             <div className="history-list">
@@ -566,26 +568,26 @@ function HomePage() {
                 historyQuery.data.items.map((item) => (
                   <article key={item.id} className="history-item">
                     <p>
-                      <strong>Arquivo:</strong> {item.fileName}
+                      <strong>File:</strong> {item.fileName}
                     </p>
                     <p>
                       <strong>Status:</strong> {item.status}
                     </p>
                     <p>
-                      <strong>Data:</strong>{" "}
+                      <strong>Date:</strong>{" "}
                       {new Date(item.createdAt).toLocaleString()}
                     </p>
                     <p>
-                      <strong>Versao:</strong> {item.versionKey} (
+                      <strong>Version:</strong> {item.versionKey} (
                       {item.dockerTag})
                     </p>
                     <Link className="details-link" to={`/test-runs/${item.id}`}>
-                      Ver detalhes
+                      View details
                     </Link>
                   </article>
                 ))
               ) : (
-                <p>Nenhum teste encontrado para os filtros informados.</p>
+                <p>No tests found for the selected filters.</p>
               )}
             </div>
           ) : null}
@@ -682,20 +684,18 @@ function TestRunDetailsPage() {
     <main className="page">
       <section className="card">
         <div className="section-title-row">
-          <h1>Detalhes do teste</h1>
+          <h1>Test details</h1>
           <button
             type="button"
             className="button-secondary"
             onClick={() => navigate("/")}
           >
-            Voltar
+            Back
           </button>
         </div>
 
-        {testRunQuery.isLoading ? <p>Carregando detalhes...</p> : null}
-        {testRunQuery.isError ? (
-          <p>Não foi possível carregar este teste.</p>
-        ) : null}
+        {testRunQuery.isLoading ? <p>Loading details...</p> : null}
+        {testRunQuery.isError ? <p>Could not load this test run.</p> : null}
 
         {testRunQuery.data ? (
           <section className="result-box details-panel">
@@ -703,30 +703,29 @@ function TestRunDetailsPage() {
               <strong>ID:</strong> {testRunQuery.data.id}
             </p>
             <p>
-              <strong>Arquivo:</strong> {testRunQuery.data.fileName}
+              <strong>File:</strong> {testRunQuery.data.fileName}
             </p>
             <p>
               <strong>Status:</strong> {testRunQuery.data.status}
             </p>
             <p>
-              <strong>Fase:</strong> {testRunQuery.data.phase}
+              <strong>Phase:</strong> {testRunQuery.data.phase}
             </p>
             <p>
-              <strong>Versão:</strong> {testRunQuery.data.versionKey} (
+              <strong>Version:</strong> {testRunQuery.data.versionKey} (
               {testRunQuery.data.dockerTag})
             </p>
             <p>
-              <strong>Criado em:</strong>{" "}
+              <strong>Created at:</strong>{" "}
               {new Date(testRunQuery.data.createdAt).toLocaleString()}
             </p>
             <p>
-              <strong>Resumo:</strong>{" "}
-              {testRunQuery.data.resultSummary ?? "Processando..."}
+              <strong>Summary:</strong>{" "}
+              {testRunQuery.data.resultSummary ?? "Processing..."}
             </p>
             <p>
-              <strong>Bundle detectado:</strong>{" "}
-              {testRunQuery.data.bundleIdentity?.symbolicName ??
-                "Não detectado"}
+              <strong>Detected bundle:</strong>{" "}
+              {testRunQuery.data.bundleIdentity?.symbolicName ?? "Not detected"}
               {testRunQuery.data.bundleIdentity?.version
                 ? ` (${testRunQuery.data.bundleIdentity.version})`
                 : ""}
@@ -746,7 +745,7 @@ function TestRunDetailsPage() {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Abrir Liferay em localhost:{testRunQuery.data.mappedPort}
+                  Open Liferay at localhost:{testRunQuery.data.mappedPort}
                 </a>
               </p>
             ) : null}
@@ -763,40 +762,40 @@ function TestRunDetailsPage() {
                 }
               >
                 {killMutation.isPending
-                  ? "Matando container..."
-                  : "Matar container"}
+                  ? "Killing container..."
+                  : "Kill container"}
               </button>
             </div>
 
-            <h2>Evidências de deploy</h2>
+            <h2>Deployment evidence</h2>
             <div className="evidence-box">
               <p>
-                <strong>Processing detectado:</strong>{" "}
+                <strong>Detected Processing:</strong>{" "}
                 {testRunQuery.data.deployEvidence?.processingLine ??
-                  "Não detectado"}
+                  "Not detected"}
               </p>
               <p>
-                <strong>STARTED detectado:</strong>{" "}
+                <strong>Detected STARTED:</strong>{" "}
                 {testRunQuery.data.deployEvidence?.startedLine ??
-                  "Não detectado"}
+                  "Not detected"}
               </p>
               <p>
-                <strong>Primeira falha detectada:</strong>{" "}
+                <strong>First detected failure:</strong>{" "}
                 {testRunQuery.data.deployEvidence?.firstFailureLine ??
-                  "Não detectado"}
+                  "Not detected"}
               </p>
               <p>
-                <strong>STARTED candidatos:</strong>{" "}
+                <strong>STARTED candidates:</strong>{" "}
                 {testRunQuery.data.startedBundleCandidates.length
                   ? testRunQuery.data.startedBundleCandidates.join(" | ")
-                  : "Não detectado"}
+                  : "Not detected"}
               </p>
             </div>
 
             {failureReason ? (
               <div className="failure-box">
                 <div className="failure-header-row">
-                  <strong>Motivo provável da falha:</strong>
+                  <strong>Likely failure reason:</strong>
                   {failureAnalysis ? (
                     <span
                       className={`severity-badge severity-${failureAnalysis.severity}`}
@@ -807,7 +806,7 @@ function TestRunDetailsPage() {
                 </div>
                 {failureAnalysis ? (
                   <p>
-                    <strong>Categoria:</strong> {failureAnalysis.category}
+                    <strong>Category:</strong> {failureAnalysis.category}
                   </p>
                 ) : null}
                 <p>{failureReason}</p>
@@ -825,8 +824,8 @@ function TestRunDetailsPage() {
             <div className="console-toolbar">
               <span>
                 {autoScrollEnabled
-                  ? "Auto-scroll ligado"
-                  : "Auto-scroll pausado (role para baixo para retomar)"}
+                  ? "Auto-scroll enabled"
+                  : "Auto-scroll paused (scroll down to resume)"}
               </span>
               <button
                 type="button"
@@ -842,7 +841,7 @@ function TestRunDetailsPage() {
                   setAutoScrollEnabled(true);
                 }}
               >
-                Ir para o fim
+                Jump to end
               </button>
             </div>
             <pre
@@ -850,8 +849,7 @@ function TestRunDetailsPage() {
               onScroll={handleConsoleScroll}
               className="live-console"
             >
-              {testRunQuery.data.logs.join("\n") ||
-                "Sem logs relevantes ainda."}
+              {testRunQuery.data.logs.join("\n") || "No relevant logs yet."}
             </pre>
           </section>
         ) : null}
