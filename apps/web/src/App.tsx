@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
   Link,
   Navigate,
@@ -140,6 +140,141 @@ function analyzeFailure(
   };
 }
 
+// ─── Shared UI components ─────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: TestRunRecord["status"] }) {
+  return <span className={`status-badge status-${status}`}>{status}</span>;
+}
+
+function PhaseLabel({ phase }: { phase: string }) {
+  return (
+    <span className="phase-label">{phase.replace(/_/g, " ")}</span>
+  );
+}
+
+function LogConsole({
+  logs,
+  autoScrollEnabled,
+  consoleRef,
+  onScroll,
+  onJumpToEnd,
+}: {
+  logs: string[];
+  autoScrollEnabled: boolean;
+  consoleRef: RefObject<HTMLPreElement | null>;
+  onScroll: () => void;
+  onJumpToEnd: () => void;
+}) {
+  return (
+    <div className="console-wrapper">
+      <div className="console-header">
+        <div className="console-dots">
+          <div className="console-dot" />
+          <div className="console-dot" />
+          <div className="console-dot" />
+        </div>
+        <span className="console-title">Live logs</span>
+        <span className="console-scroll-status">
+          {autoScrollEnabled ? "auto-scroll ↓" : "paused"}
+        </span>
+        <button
+          type="button"
+          className="btn-ghost"
+          style={{ fontSize: "11px", padding: "3px 10px" }}
+          onClick={onJumpToEnd}
+        >
+          Jump to end
+        </button>
+      </div>
+      <pre ref={consoleRef} onScroll={onScroll} className="live-console">
+        {logs.join("\n") || "No relevant logs yet."}
+      </pre>
+    </div>
+  );
+}
+
+function EvidencePanel({ record }: { record: TestRunRecord }) {
+  const items = [
+    { label: "Processing detected", value: record.deployEvidence?.processingLine },
+    { label: "STARTED detected", value: record.deployEvidence?.startedLine },
+    { label: "First failure", value: record.deployEvidence?.firstFailureLine },
+    {
+      label: "STARTED candidates",
+      value: record.startedBundleCandidates.length
+        ? record.startedBundleCandidates.join(" | ")
+        : undefined,
+    },
+  ];
+  return (
+    <div className="evidence-grid">
+      {items.map((item) => (
+        <div key={item.label} className="evidence-item">
+          <div className="evidence-item-label">{item.label}</div>
+          <div
+            className={`evidence-item-value${
+              !item.value ? " evidence-item-empty" : ""
+            }`}
+          >
+            {item.value ?? "Not detected"}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FailurePanel({
+  reason,
+  analysis,
+}: {
+  reason: string;
+  analysis: FailureAnalysis | null;
+}) {
+  return (
+    <div className="failure-panel">
+      <div className="failure-panel-header">
+        <span className="failure-panel-title">Failure analysis</span>
+        {analysis ? (
+          <span className={`severity-badge severity-${analysis.severity}`}>
+            {analysis.severity}
+          </span>
+        ) : null}
+      </div>
+      {analysis ? (
+        <p className="failure-category">{analysis.category}</p>
+      ) : null}
+      <div className="failure-panel-reason">{reason}</div>
+      {analysis?.suggestions?.length ? (
+        <ul className="suggestions-list">
+          {analysis.suggestions.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function AppTopbar({ breadcrumb }: { breadcrumb?: string }) {
+  return (
+    <header className="topbar">
+      <Link to="/" className="topbar-logo">
+        <div className="topbar-logo-icon">L</div>
+        <span className="topbar-logo-text">App Analyzer</span>
+      </Link>
+      {breadcrumb ? (
+        <>
+          <div className="topbar-sep" />
+          <span className="topbar-breadcrumb">{breadcrumb}</span>
+        </>
+      ) : null}
+      <div className="topbar-spacer" />
+      <span className="topbar-badge">Liferay DXP</span>
+    </header>
+  );
+}
+
+// ─── Home page ────────────────────────────────────────────────────────────────
 function HomePage() {
   const queryClient = useQueryClient();
   const [selectedVersion, setSelectedVersion] = useState("");
@@ -307,296 +442,359 @@ function HomePage() {
   };
 
   return (
-    <main className="page">
-      <section className="card">
-        <h1>Liferay App Analyzer</h1>
-        <p>
-          Upload .jar/.war files, select a DXP version, and run tests in queue.
-        </p>
-
-        <div className="field">
-          <label htmlFor="version">Liferay Version</label>
-          <select
-            id="version"
-            value={selectedVersion}
-            onChange={(event) => {
-              setSelectedVersion(event.target.value);
-              setSelectedDockerTag("");
-            }}
-          >
-            <option value="">Select a version</option>
-            {versionsQuery.data?.map((version) => (
-              <option key={version.key} value={version.key}>
-                {version.label} ({version.dockerTag})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="field">
-          <label htmlFor="docker-tag">Docker Tag (optional)</label>
-          <select
-            id="docker-tag"
-            value={selectedDockerTag}
-            onChange={(event) => setSelectedDockerTag(event.target.value)}
-            disabled={!selectedVersion || dockerTagsQuery.isLoading}
-          >
-            <option value="">
-              Automatic ({selectedVersionOption?.dockerTag ?? "version tag"})
-            </option>
-            {filteredDockerTagOptions.map((tag) => (
-              <option key={tag.name} value={tag.name}>
-                {tag.name}
-              </option>
-            ))}
-          </select>
-          {dockerTagsQuery.isError ? (
-            <small>Could not load Docker Hub tags right now.</small>
-          ) : null}
-        </div>
-
-        <div className="field">
-          <label htmlFor="file">File</label>
-          <input
-            id="file"
-            type="file"
-            accept=".jar,.war"
-            onChange={(event) =>
-              setSelectedFile(event.target.files?.[0] ?? null)
-            }
-          />
-        </div>
-
-        <button type="button" disabled={!canSubmit} onClick={handleSubmit}>
-          {createTestRunMutation.isPending ? "Queueing..." : "Start test"}
-        </button>
-
-        <label className="checkbox-inline" htmlFor="keep-alive">
-          <input
-            id="keep-alive"
-            type="checkbox"
-            checked={keepAlive}
-            onChange={(event) => setKeepAlive(event.target.checked)}
-          />
-          Keep alive (do not stop container at the end of the test)
-        </label>
-
-        {selectedFile ? <p>Selected file: {selectedFile.name}</p> : null}
-
-        {versionsQuery.isLoading ? <p>Loading versions...</p> : null}
-        {versionsQuery.isError ? (
-          <p>Failed to fetch versions from API.</p>
-        ) : null}
-        {createTestRunMutation.isError ? <p>Failed to queue test.</p> : null}
-
-        {testRunQuery.data ? (
-          <section className="result-box">
-            <h2>Current test result</h2>
-            <p>
-              <strong>ID:</strong> {testRunQuery.data.id}
-            </p>
-            <p>
-              <strong>Status:</strong> {testRunQuery.data.status}
-            </p>
-            <p>
-              <strong>Phase:</strong> {testRunQuery.data.phase}
-            </p>
-            <p>
-              <strong>Summary:</strong>{" "}
-              {testRunQuery.data.resultSummary ?? "Processing..."}
-            </p>
-            {testRunQuery.data.mappedPort ? (
-              <p>
-                <strong>Portal:</strong>{" "}
-                <a
-                  className="details-link"
-                  href={`http://localhost:${testRunQuery.data.mappedPort}`}
-                  target="_blank"
-                  rel="noreferrer"
+    <div className="app-shell">
+      <AppTopbar />
+      <div className="page-content">
+        <div className="page-grid">
+          {/* ── Left: form ── */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">New test run</span>
+            </div>
+            <div className="card-body">
+              <div className="field">
+                <label htmlFor="version">Liferay version</label>
+                <select
+                  id="version"
+                  value={selectedVersion}
+                  onChange={(event) => {
+                    setSelectedVersion(event.target.value);
+                    setSelectedDockerTag("");
+                  }}
                 >
-                  Open Liferay at localhost:{testRunQuery.data.mappedPort}
-                </a>
-              </p>
-            ) : null}
-            <Link
-              className="details-link"
-              to={`/test-runs/${testRunQuery.data.id}`}
-            >
-              View test details
-            </Link>
-          </section>
-        ) : null}
-
-        <section className="result-box">
-          <h2>Active containers (keep alive)</h2>
-          {activeContainersQuery.isLoading ? (
-            <p>Loading active containers...</p>
-          ) : null}
-          {activeContainersQuery.isError ? (
-            <p>Failed to list active containers.</p>
-          ) : null}
-          {!activeContainersQuery.isLoading &&
-          !activeContainersQuery.isError ? (
-            activeContainersQuery.data?.items.length ? (
-              <div className="history-list">
-                {activeContainersQuery.data.items.map((item) => (
-                  <article key={item.id} className="history-item">
-                    <p>
-                      <strong>Test run:</strong> {item.id}
-                    </p>
-                    <p>
-                      <strong>File:</strong> {item.fileName}
-                    </p>
-                    <p>
-                      <strong>Container:</strong> {item.containerId ?? "N/A"}
-                    </p>
-                    <p>
-                      <strong>Portal:</strong>{" "}
-                      {item.mappedPort ? (
-                        <a
-                          className="details-link"
-                          href={`http://localhost:${item.mappedPort}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          localhost:{item.mappedPort}
-                        </a>
-                      ) : (
-                        "N/A"
-                      )}
-                    </p>
-                    <Link className="details-link" to={`/test-runs/${item.id}`}>
-                      Manage test
-                    </Link>
-                  </article>
-                ))}
+                  <option value="">Select a version</option>
+                  {versionsQuery.data?.map((version) => (
+                    <option key={version.key} value={version.key}>
+                      {version.label} — {version.dockerTag}
+                    </option>
+                  ))}
+                </select>
+                {versionsQuery.isLoading ? <small>Loading versions…</small> : null}
+                {versionsQuery.isError ? (
+                  <small style={{ color: "var(--error)" }}>
+                    Failed to fetch versions.
+                  </small>
+                ) : null}
               </div>
-            ) : (
-              <p>No active containers at the moment.</p>
-            )
-          ) : null}
-        </section>
 
-        <section className="result-box">
-          <div className="section-title-row">
-            <h2>Test history</h2>
+              <div className="field">
+                <label htmlFor="docker-tag">Docker tag (optional)</label>
+                <select
+                  id="docker-tag"
+                  value={selectedDockerTag}
+                  onChange={(event) => setSelectedDockerTag(event.target.value)}
+                  disabled={!selectedVersion || dockerTagsQuery.isLoading}
+                >
+                  <option value="">
+                    Automatic — {selectedVersionOption?.dockerTag ?? "version default"}
+                  </option>
+                  {filteredDockerTagOptions.map((tag) => (
+                    <option key={tag.name} value={tag.name}>
+                      {tag.name}
+                    </option>
+                  ))}
+                </select>
+                {dockerTagsQuery.isError ? (
+                  <small>Could not load Docker Hub tags.</small>
+                ) : null}
+              </div>
+
+              <div className="field">
+                <label htmlFor="file">Artifact</label>
+                <input
+                  id="file"
+                  type="file"
+                  accept=".jar,.war"
+                  onChange={(event) =>
+                    setSelectedFile(event.target.files?.[0] ?? null)
+                  }
+                />
+              </div>
+
+              {selectedFile ? (
+                <div className="selected-file">📦 {selectedFile.name}</div>
+              ) : null}
+
+              <label className="checkbox-row" htmlFor="keep-alive">
+                <input
+                  id="keep-alive"
+                  type="checkbox"
+                  checked={keepAlive}
+                  onChange={(event) => setKeepAlive(event.target.checked)}
+                />
+                <span>Keep container alive after test</span>
+              </label>
+
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ width: "100%" }}
+                disabled={!canSubmit}
+                onClick={handleSubmit}
+              >
+                {createTestRunMutation.isPending ? "Queueing…" : "Run test"}
+              </button>
+
+              {createTestRunMutation.isError ? (
+                <div className="alert alert-error">Failed to queue test.</div>
+              ) : null}
+            </div>
+          </div>
+
+          {/* ── Right: current run + active containers ── */}
+          <div className="stack">
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title">Current run</span>
+                {testRunQuery.data ? (
+                  <StatusBadge status={testRunQuery.data.status} />
+                ) : null}
+              </div>
+              <div className="card-body">
+                {testRunQuery.data ? (
+                  <>
+                    <div className="data-table">
+                      <div className="data-row">
+                        <span className="data-label">ID</span>
+                        <span className="data-value data-value-mono">
+                          {testRunQuery.data.id.slice(0, 20)}…
+                        </span>
+                      </div>
+                      <div className="data-row">
+                        <span className="data-label">Phase</span>
+                        <PhaseLabel phase={testRunQuery.data.phase} />
+                      </div>
+                      <div className="data-row">
+                        <span className="data-label">Summary</span>
+                        <span className="data-value">
+                          {testRunQuery.data.resultSummary ?? "Processing…"}
+                        </span>
+                      </div>
+                      {testRunQuery.data.mappedPort ? (
+                        <div className="data-row">
+                          <span className="data-label">Portal</span>
+                          <a
+                            className="link-external"
+                            href={`http://localhost:${testRunQuery.data.mappedPort}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            localhost:{testRunQuery.data.mappedPort} ↗
+                          </a>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div style={{ marginTop: "14px" }}>
+                      <Link
+                        className="link"
+                        to={`/test-runs/${testRunQuery.data.id}`}
+                      >
+                        View full details →
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <p className="empty-state" style={{ padding: "16px 0" }}>
+                    No test running. Configure a run on the left.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title">Active containers</span>
+              </div>
+              <div className="card-body">
+                {activeContainersQuery.isLoading ? (
+                  <p className="loading-text">Loading…</p>
+                ) : activeContainersQuery.isError ? (
+                  <div className="alert alert-error">
+                    Failed to list active containers.
+                  </div>
+                ) : activeContainersQuery.data?.items.length ? (
+                  <div className="container-list">
+                    {activeContainersQuery.data.items.map((item) => (
+                      <div key={item.id} className="container-item">
+                        <div className="container-info">
+                          <div className="container-name">{item.fileName}</div>
+                          <div className="container-meta">
+                            {item.containerId?.slice(0, 12) ?? "—"}
+                            {item.mappedPort ? (
+                              <>
+                                {" · "}
+                                <a
+                                  className="link"
+                                  href={`http://localhost:${item.mappedPort}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  :{item.mappedPort}
+                                </a>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+                        <StatusBadge status={item.status} />
+                        <Link className="link" to={`/test-runs/${item.id}`}>
+                          Manage →
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="empty-state" style={{ padding: "12px 0" }}>
+                    No active containers.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── History (full width) ── */}
+        <div className="card" style={{ marginTop: "20px" }}>
+          <div className="card-header">
+            <span className="card-title">Test history</span>
             <button
               type="button"
-              className="button-secondary"
+              className="btn-ghost"
               onClick={clearHistoryFilters}
               disabled={!hasActiveHistoryFilters}
             >
               Clear filters
             </button>
           </div>
-
-          {activeFilterChips.length ? (
-            <div className="chip-row">
-              {activeFilterChips.map((chip) => (
-                <span key={chip} className="chip">
-                  {chip}
-                </span>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="history-filters">
-            <div className="field">
-              <label htmlFor="history-file-name">File name</label>
-              <input
-                id="history-file-name"
-                type="text"
-                placeholder="e.g. my-app"
-                value={historyFileName}
-                onChange={(event) => setHistoryFileName(event.target.value)}
-              />
-            </div>
-
-            <div className="field">
-              <label htmlFor="history-status">Status</label>
-              <select
-                id="history-status"
-                value={historyStatus}
-                onChange={(event) =>
-                  setHistoryStatus(
-                    event.target.value as
-                      | ""
-                      | "queued"
-                      | "running"
-                      | "success"
-                      | "failed"
-                      | "error",
-                  )
-                }
-              >
-                <option value="">All</option>
-                {STATUS_OPTIONS.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
+          <div className="card-body">
+            {activeFilterChips.length ? (
+              <div className="chip-row">
+                {activeFilterChips.map((chip) => (
+                  <span key={chip} className="chip">
+                    {chip}
+                  </span>
                 ))}
-              </select>
+              </div>
+            ) : null}
+
+            <div className="filters-bar">
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label htmlFor="h-name">File name</label>
+                <input
+                  id="h-name"
+                  type="text"
+                  placeholder="e.g. my-app"
+                  value={historyFileName}
+                  onChange={(event) => setHistoryFileName(event.target.value)}
+                />
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label htmlFor="h-status">Status</label>
+                <select
+                  id="h-status"
+                  value={historyStatus}
+                  onChange={(event) =>
+                    setHistoryStatus(
+                      event.target.value as
+                        | ""
+                        | "queued"
+                        | "running"
+                        | "success"
+                        | "failed"
+                        | "error",
+                    )
+                  }
+                >
+                  <option value="">All</option>
+                  {STATUS_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label htmlFor="h-from">Start date</label>
+                <input
+                  id="h-from"
+                  type="date"
+                  value={historyCreatedFrom}
+                  onChange={(event) =>
+                    setHistoryCreatedFrom(event.target.value)
+                  }
+                />
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label htmlFor="h-to">End date</label>
+                <input
+                  id="h-to"
+                  type="date"
+                  value={historyCreatedTo}
+                  onChange={(event) => setHistoryCreatedTo(event.target.value)}
+                />
+              </div>
             </div>
 
-            <div className="field">
-              <label htmlFor="history-created-from">Start date</label>
-              <input
-                id="history-created-from"
-                type="date"
-                value={historyCreatedFrom}
-                onChange={(event) => setHistoryCreatedFrom(event.target.value)}
-              />
-            </div>
+            {historyQuery.isLoading ? (
+              <p className="loading-text">Loading history…</p>
+            ) : null}
+            {historyQuery.isError ? (
+              <div className="alert alert-error">Failed to load history.</div>
+            ) : null}
 
-            <div className="field">
-              <label htmlFor="history-created-to">End date</label>
-              <input
-                id="history-created-to"
-                type="date"
-                value={historyCreatedTo}
-                onChange={(event) => setHistoryCreatedTo(event.target.value)}
-              />
-            </div>
-          </div>
-
-          {historyQuery.isLoading ? <p>Loading history...</p> : null}
-          {historyQuery.isError ? <p>Failed to load history.</p> : null}
-
-          {!historyQuery.isLoading && !historyQuery.isError ? (
-            <div className="history-list">
-              {historyQuery.data?.items.length ? (
-                historyQuery.data.items.map((item) => (
-                  <article key={item.id} className="history-item">
-                    <p>
-                      <strong>File:</strong> {item.fileName}
-                    </p>
-                    <p>
-                      <strong>Status:</strong> {item.status}
-                    </p>
-                    <p>
-                      <strong>Date:</strong>{" "}
-                      {new Date(item.createdAt).toLocaleString()}
-                    </p>
-                    <p>
-                      <strong>Version:</strong> {item.versionKey} (
-                      {item.dockerTag})
-                    </p>
-                    <Link className="details-link" to={`/test-runs/${item.id}`}>
-                      View details
-                    </Link>
-                  </article>
-                ))
+            {!historyQuery.isLoading && !historyQuery.isError ? (
+              historyQuery.data?.items.length ? (
+                <table className="history-table">
+                  <thead>
+                    <tr>
+                      <th>File</th>
+                      <th>Version</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyQuery.data.items.map((item) => (
+                      <tr key={item.id}>
+                        <td className="file-name">{item.fileName}</td>
+                        <td>
+                          <span className="version-tag">{item.versionKey}</span>
+                          <span
+                            className="version-tag"
+                            style={{ marginLeft: 6, opacity: 0.5 }}
+                          >
+                            ({item.dockerTag})
+                          </span>
+                        </td>
+                        <td>
+                          <StatusBadge status={item.status} />
+                        </td>
+                        <td style={{ whiteSpace: "nowrap" }}>
+                          {new Date(item.createdAt).toLocaleString()}
+                        </td>
+                        <td className="action-cell">
+                          <Link className="link" to={`/test-runs/${item.id}`}>
+                            Details →
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               ) : (
-                <p>No tests found for the selected filters.</p>
-              )}
-            </div>
-          ) : null}
-        </section>
-      </section>
-    </main>
+                <p className="empty-state">
+                  No tests found for the selected filters.
+                </p>
+              )
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
+// ─── Details page ─────────────────────────────────────────────────────────────
 function TestRunDetailsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -680,184 +878,191 @@ function TestRunDetailsPage() {
     setAutoScrollEnabled(distanceFromBottom < 20);
   };
 
+  const handleJumpToEnd = () => {
+    const element = consoleRef.current;
+    if (!element) return;
+    element.scrollTop = element.scrollHeight;
+    setAutoScrollEnabled(true);
+  };
+
   return (
-    <main className="page">
-      <section className="card">
-        <div className="section-title-row">
-          <h1>Test details</h1>
+    <div className="app-shell">
+      <AppTopbar breadcrumb="Test details" />
+      <div className="page-content">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            marginBottom: "20px",
+          }}
+        >
           <button
             type="button"
-            className="button-secondary"
+            className="btn-ghost"
             onClick={() => navigate("/")}
           >
-            Back
+            ← Back
           </button>
+          {testRunQuery.data ? (
+            <StatusBadge status={testRunQuery.data.status} />
+          ) : null}
+          {testRunQuery.data ? (
+            <PhaseLabel phase={testRunQuery.data.phase} />
+          ) : null}
         </div>
 
-        {testRunQuery.isLoading ? <p>Loading details...</p> : null}
-        {testRunQuery.isError ? <p>Could not load this test run.</p> : null}
+        {testRunQuery.isLoading ? (
+          <p className="loading-text">Loading…</p>
+        ) : null}
+        {testRunQuery.isError ? (
+          <div className="alert alert-error">
+            Could not load this test run.
+          </div>
+        ) : null}
 
         {testRunQuery.data ? (
-          <section className="result-box details-panel">
-            <p>
-              <strong>ID:</strong> {testRunQuery.data.id}
-            </p>
-            <p>
-              <strong>File:</strong> {testRunQuery.data.fileName}
-            </p>
-            <p>
-              <strong>Status:</strong> {testRunQuery.data.status}
-            </p>
-            <p>
-              <strong>Phase:</strong> {testRunQuery.data.phase}
-            </p>
-            <p>
-              <strong>Version:</strong> {testRunQuery.data.versionKey} (
-              {testRunQuery.data.dockerTag})
-            </p>
-            <p>
-              <strong>Created at:</strong>{" "}
-              {new Date(testRunQuery.data.createdAt).toLocaleString()}
-            </p>
-            <p>
-              <strong>Summary:</strong>{" "}
-              {testRunQuery.data.resultSummary ?? "Processing..."}
-            </p>
-            <p>
-              <strong>Detected bundle:</strong>{" "}
-              {testRunQuery.data.bundleIdentity?.symbolicName ?? "Not detected"}
-              {testRunQuery.data.bundleIdentity?.version
-                ? ` (${testRunQuery.data.bundleIdentity.version})`
-                : ""}
-            </p>
-            {testRunQuery.data.runtimeDeadlineAt ? (
-              <p>
-                <strong>Deadline:</strong>{" "}
-                {new Date(testRunQuery.data.runtimeDeadlineAt).toLocaleString()}
-              </p>
-            ) : null}
-            {testRunQuery.data.mappedPort ? (
-              <p>
-                <strong>Portal:</strong>{" "}
-                <a
-                  className="details-link"
-                  href={`http://localhost:${testRunQuery.data.mappedPort}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open Liferay at localhost:{testRunQuery.data.mappedPort}
-                </a>
-              </p>
-            ) : null}
-
-            <div className="action-row">
-              <button
-                type="button"
-                className="button-secondary"
-                onClick={() => killMutation.mutate(testRunId)}
-                disabled={
-                  killMutation.isPending ||
-                  !testRunQuery.data.containerId ||
-                  isTerminalStatus(testRunQuery.data.status)
-                }
-              >
-                {killMutation.isPending
-                  ? "Killing container..."
-                  : "Kill container"}
-              </button>
-            </div>
-
-            <h2>Deployment evidence</h2>
-            <div className="evidence-box">
-              <p>
-                <strong>Detected Processing:</strong>{" "}
-                {testRunQuery.data.deployEvidence?.processingLine ??
-                  "Not detected"}
-              </p>
-              <p>
-                <strong>Detected STARTED:</strong>{" "}
-                {testRunQuery.data.deployEvidence?.startedLine ??
-                  "Not detected"}
-              </p>
-              <p>
-                <strong>First detected failure:</strong>{" "}
-                {testRunQuery.data.deployEvidence?.firstFailureLine ??
-                  "Not detected"}
-              </p>
-              <p>
-                <strong>STARTED candidates:</strong>{" "}
-                {testRunQuery.data.startedBundleCandidates.length
-                  ? testRunQuery.data.startedBundleCandidates.join(" | ")
-                  : "Not detected"}
-              </p>
-            </div>
-
-            {failureReason ? (
-              <div className="failure-box">
-                <div className="failure-header-row">
-                  <strong>Likely failure reason:</strong>
-                  {failureAnalysis ? (
-                    <span
-                      className={`severity-badge severity-${failureAnalysis.severity}`}
-                    >
-                      {failureAnalysis.severity}
-                    </span>
-                  ) : null}
+          <div className="stack">
+            {/* Metadata + logs */}
+            <div className="details-grid">
+              <div className="card">
+                <div className="card-header">
+                  <span className="card-title">Run details</span>
+                  <button
+                    type="button"
+                    className="btn-danger"
+                    onClick={() => killMutation.mutate(testRunId)}
+                    disabled={
+                      killMutation.isPending ||
+                      !testRunQuery.data.containerId ||
+                      isTerminalStatus(testRunQuery.data.status)
+                    }
+                  >
+                    {killMutation.isPending ? "Killing…" : "Kill container"}
+                  </button>
                 </div>
-                {failureAnalysis ? (
-                  <p>
-                    <strong>Category:</strong> {failureAnalysis.category}
-                  </p>
-                ) : null}
-                <p>{failureReason}</p>
-                {failureAnalysis?.suggestions?.length ? (
-                  <ul className="suggestions-list">
-                    {failureAnalysis.suggestions.map((suggestion) => (
-                      <li key={suggestion}>{suggestion}</li>
-                    ))}
-                  </ul>
-                ) : null}
+                <div className="card-body">
+                  <div className="data-table">
+                    <div className="data-row">
+                      <span className="data-label">ID</span>
+                      <span className="data-value data-value-mono">
+                        {testRunQuery.data.id.slice(0, 18)}…
+                      </span>
+                    </div>
+                    <div className="data-row">
+                      <span className="data-label">File</span>
+                      <span className="data-value data-value-mono">
+                        {testRunQuery.data.fileName}
+                      </span>
+                    </div>
+                    <div className="data-row">
+                      <span className="data-label">Version</span>
+                      <span className="data-value data-value-mono">
+                        {testRunQuery.data.versionKey}
+                      </span>
+                    </div>
+                    <div className="data-row">
+                      <span className="data-label">Docker tag</span>
+                      <span className="data-value data-value-mono">
+                        {testRunQuery.data.dockerTag}
+                      </span>
+                    </div>
+                    <div className="data-row">
+                      <span className="data-label">Created</span>
+                      <span className="data-value">
+                        {new Date(
+                          testRunQuery.data.createdAt,
+                        ).toLocaleString()}
+                      </span>
+                    </div>
+                    {testRunQuery.data.finishedAt ? (
+                      <div className="data-row">
+                        <span className="data-label">Finished</span>
+                        <span className="data-value">
+                          {new Date(
+                            testRunQuery.data.finishedAt,
+                          ).toLocaleString()}
+                        </span>
+                      </div>
+                    ) : null}
+                    {testRunQuery.data.runtimeDeadlineAt ? (
+                      <div className="data-row">
+                        <span className="data-label">Deadline</span>
+                        <span className="data-value">
+                          {new Date(
+                            testRunQuery.data.runtimeDeadlineAt,
+                          ).toLocaleString()}
+                        </span>
+                      </div>
+                    ) : null}
+                    {testRunQuery.data.bundleIdentity?.symbolicName ? (
+                      <div className="data-row">
+                        <span className="data-label">Bundle</span>
+                        <span className="data-value data-value-mono">
+                          {testRunQuery.data.bundleIdentity.symbolicName}
+                          {testRunQuery.data.bundleIdentity.version
+                            ? ` (${testRunQuery.data.bundleIdentity.version})`
+                            : ""}
+                        </span>
+                      </div>
+                    ) : null}
+                    {testRunQuery.data.mappedPort ? (
+                      <div className="data-row">
+                        <span className="data-label">Portal</span>
+                        <a
+                          className="link-external"
+                          href={`http://localhost:${testRunQuery.data.mappedPort}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          localhost:{testRunQuery.data.mappedPort} ↗
+                        </a>
+                      </div>
+                    ) : null}
+                    <div className="data-row">
+                      <span className="data-label">Summary</span>
+                      <span className="data-value">
+                        {testRunQuery.data.resultSummary ?? "Processing…"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-            ) : null}
 
-            <h2>Logs</h2>
-            <div className="console-toolbar">
-              <span>
-                {autoScrollEnabled
-                  ? "Auto-scroll enabled"
-                  : "Auto-scroll paused (scroll down to resume)"}
-              </span>
-              <button
-                type="button"
-                className="button-secondary"
-                onClick={() => {
-                  const element = consoleRef.current;
-
-                  if (!element) {
-                    return;
-                  }
-
-                  element.scrollTop = element.scrollHeight;
-                  setAutoScrollEnabled(true);
-                }}
-              >
-                Jump to end
-              </button>
+              <LogConsole
+                logs={testRunQuery.data.logs}
+                autoScrollEnabled={autoScrollEnabled}
+                consoleRef={consoleRef}
+                onScroll={handleConsoleScroll}
+                onJumpToEnd={handleJumpToEnd}
+              />
             </div>
-            <pre
-              ref={consoleRef}
-              onScroll={handleConsoleScroll}
-              className="live-console"
-            >
-              {testRunQuery.data.logs.join("\n") || "No relevant logs yet."}
-            </pre>
-          </section>
+
+            {/* Deployment evidence */}
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title">Deployment evidence</span>
+              </div>
+              <div className="card-body">
+                <EvidencePanel record={testRunQuery.data} />
+              </div>
+            </div>
+
+            {/* Failure analysis */}
+            {failureReason ? (
+              <FailurePanel
+                reason={failureReason}
+                analysis={failureAnalysis}
+              />
+            ) : null}
+          </div>
         ) : null}
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }
 
+// ─── Routes ───────────────────────────────────────────────────────────────────
 export function App() {
   return (
     <Routes>
