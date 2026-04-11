@@ -95,14 +95,10 @@ export async function requestKillTestRun(testRunId: string) {
 
   if (killed) {
     testRunStore.update(testRunId, {
-      status: "failed",
-      phase: "completed_killed",
-      resultSummary: "Execution interrupted: container killed by user.",
       containerId: null,
       mappedPort: null,
       killRequestedAt: new Date().toISOString(),
       killedAt: new Date().toISOString(),
-      finishedAt: new Date().toISOString(),
     });
   }
 
