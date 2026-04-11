@@ -288,12 +288,25 @@ export class LiferayTestRunner {
   async killRun(testRunId: string) {
     const active = this.activeRuns.get(testRunId);
 
-    if (!active) {
+    let containerId: string | null = null;
+
+    if (active) {
+      containerId = active.containerId;
+    } else {
+      // Fallback: check if this is a finished run with keepAlive enabled
+      const { testRunStore } = await import("./test-run-store.js");
+      const record = testRunStore.getById(testRunId);
+      if (record?.containerId) {
+        containerId = record.containerId;
+      }
+    }
+
+    if (!containerId) {
       return false;
     }
 
     this.killedRuns.add(testRunId);
-    await this.cleanupContainer(active.containerId);
+    await this.cleanupContainer(containerId);
     this.activeRuns.delete(testRunId);
     return true;
   }

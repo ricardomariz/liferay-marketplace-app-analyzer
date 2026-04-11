@@ -458,12 +458,18 @@ function HomePage() {
                 <select
                   id="version"
                   value={selectedVersion}
+                  disabled={versionsQuery.isLoading}
+                  aria-busy={versionsQuery.isLoading}
                   onChange={(event) => {
                     setSelectedVersion(event.target.value);
                     setSelectedDockerTag("");
                   }}
                 >
-                  <option value="">Select a version</option>
+                  <option value="">
+                    {versionsQuery.isLoading
+                      ? "Loading versions..."
+                      : "Select a version"}
+                  </option>
                   {versionsQuery.data?.map((version) => (
                     <option key={version.key} value={version.key}>
                       {version.label} — {version.dockerTag}
@@ -817,8 +823,12 @@ function TestRunDetailsPage() {
     mutationFn: killTestRun,
     onSuccess: async (payload) => {
       queryClient.setQueryData(["test-run", testRunId], payload.item);
+      await queryClient.refetchQueries({ queryKey: ["test-run", testRunId] });
       await queryClient.invalidateQueries({ queryKey: ["active-containers"] });
       await queryClient.invalidateQueries({ queryKey: ["test-runs-history"] });
+    },
+    onError: (error) => {
+      console.error("Failed to kill container:", error);
     },
   });
 
@@ -937,7 +947,8 @@ function TestRunDetailsPage() {
                     disabled={
                       killMutation.isPending ||
                       !testRunQuery.data.containerId ||
-                      isTerminalStatus(testRunQuery.data.status)
+                      (isTerminalStatus(testRunQuery.data.status) &&
+                        !testRunQuery.data.keepAlive)
                     }
                   >
                     {killMutation.isPending ? "Killing…" : "Kill container"}

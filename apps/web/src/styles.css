@@ -700,10 +700,13 @@ button {
 .checkbox-row input[type="checkbox"] {
   width: 14px;
   height: 14px;
+  padding: 0;
+  margin: 0;
   accent-color: var(--accent);
   cursor: pointer;
   flex-shrink: 0;
-  width: auto;
+  appearance: auto;
+  -webkit-appearance: checkbox;
 }
 
 .checkbox-row span {
