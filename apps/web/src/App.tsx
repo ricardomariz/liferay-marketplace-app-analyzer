@@ -147,9 +147,7 @@ function StatusBadge({ status }: { status: TestRunRecord["status"] }) {
 }
 
 function PhaseLabel({ phase }: { phase: string }) {
-  return (
-    <span className="phase-label">{phase.replace(/_/g, " ")}</span>
-  );
+  return <span className="phase-label">{phase.replace(/_/g, " ")}</span>;
 }
 
 function LogConsole({
@@ -195,7 +193,10 @@ function LogConsole({
 
 function EvidencePanel({ record }: { record: TestRunRecord }) {
   const items = [
-    { label: "Processing detected", value: record.deployEvidence?.processingLine },
+    {
+      label: "Processing detected",
+      value: record.deployEvidence?.processingLine,
+    },
     { label: "STARTED detected", value: record.deployEvidence?.startedLine },
     { label: "First failure", value: record.deployEvidence?.firstFailureLine },
     {
@@ -469,7 +470,9 @@ function HomePage() {
                     </option>
                   ))}
                 </select>
-                {versionsQuery.isLoading ? <small>Loading versions…</small> : null}
+                {versionsQuery.isLoading ? (
+                  <small>Loading versions…</small>
+                ) : null}
                 {versionsQuery.isError ? (
                   <small style={{ color: "var(--error)" }}>
                     Failed to fetch versions.
@@ -486,7 +489,8 @@ function HomePage() {
                   disabled={!selectedVersion || dockerTagsQuery.isLoading}
                 >
                   <option value="">
-                    Automatic — {selectedVersionOption?.dockerTag ?? "version default"}
+                    Automatic —{" "}
+                    {selectedVersionOption?.dockerTag ?? "version default"}
                   </option>
                   {filteredDockerTagOptions.map((tag) => (
                     <option key={tag.name} value={tag.name}>
@@ -916,9 +920,7 @@ function TestRunDetailsPage() {
           <p className="loading-text">Loading…</p>
         ) : null}
         {testRunQuery.isError ? (
-          <div className="alert alert-error">
-            Could not load this test run.
-          </div>
+          <div className="alert alert-error">Could not load this test run.</div>
         ) : null}
 
         {testRunQuery.data ? (
@@ -970,9 +972,7 @@ function TestRunDetailsPage() {
                     <div className="data-row">
                       <span className="data-label">Created</span>
                       <span className="data-value">
-                        {new Date(
-                          testRunQuery.data.createdAt,
-                        ).toLocaleString()}
+                        {new Date(testRunQuery.data.createdAt).toLocaleString()}
                       </span>
                     </div>
                     {testRunQuery.data.finishedAt ? (
@@ -1050,10 +1050,7 @@ function TestRunDetailsPage() {
 
             {/* Failure analysis */}
             {failureReason ? (
-              <FailurePanel
-                reason={failureReason}
-                analysis={failureAnalysis}
-              />
+              <FailurePanel reason={failureReason} analysis={failureAnalysis} />
             ) : null}
           </div>
         ) : null}
