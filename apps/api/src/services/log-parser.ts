@@ -10,6 +10,13 @@ const FAILURE_PATTERNS = [
   /error \[fileinstall-directory-watcher\]/i,
 ];
 
+// Lines matching any of these patterns are never treated as failures —
+// they are known noise unrelated to the artifact under test.
+const IGNORED_ERROR_PATTERNS = [
+  /licensemanager.*license is expired/i,
+  /dxp development license/i,
+];
+
 export type ParsedLogResult = {
   success: boolean;
   failed: boolean;
@@ -105,6 +112,10 @@ export function parseDeploymentLogs(
     }
 
     if (FAILURE_PATTERNS.some((pattern) => pattern.test(line))) {
+      if (IGNORED_ERROR_PATTERNS.some((pattern) => pattern.test(line))) {
+        continue;
+      }
+
       failed = true;
       firstFailureLine ??= line;
       matchedLines.push(line);
