@@ -61,10 +61,13 @@ function pickFallbackTag(preferredTag: string, tags: DockerHubTag[]) {
     return prefixMatches.sort(sortByUpdateDesc)[0]?.name;
   }
 
-  // For quarterly tags (e.g. "2025.q3"), never fall back to a different
+  // For quarterly tags (e.g. "2025.q2"), never fall back to a different
   // quarter — that would silently resolve to the wrong version.
+  // Try appending ".0" as a last resort (e.g. "2025.q2.0").
   if (preferredTag.includes(".q")) {
-    return undefined;
+    const dotZeroTag = `${preferredTag}.0`;
+    const dotZeroMatch = tags.find((tag) => tag.name === dotZeroTag);
+    return dotZeroMatch ? dotZeroMatch.name : dotZeroTag;
   }
 
   const ltsTag = tags.find((tag) => tag.name.includes("-lts"));
