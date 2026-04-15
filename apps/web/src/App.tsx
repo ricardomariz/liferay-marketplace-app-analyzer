@@ -350,6 +350,7 @@ function HomePage() {
         if (!closed && isTerminalStatus(record.status)) {
           closed = true;
           closeSse();
+          queryClient.invalidateQueries({ queryKey: ["test-runs-history"] });
         }
       },
       onError: () => {
@@ -856,6 +857,7 @@ function TestRunDetailsPage() {
         if (!closed && isTerminalStatus(record.status)) {
           closed = true;
           closeSse();
+          queryClient.invalidateQueries({ queryKey: ["test-runs-history"] });
         }
       },
       onError: () => {
