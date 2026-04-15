@@ -18,7 +18,7 @@ type DockerHubTagsResponse = {
 const DOCKER_HUB_BASE_TAGS_URL =
   "https://hub.docker.com/v2/repositories/liferay/dxp/tags?page_size=100";
 const CACHE_TTL_MS = 5 * 60_000;
-const MAX_TAG_PAGES = 6;
+const MAX_TAG_PAGES = 10;
 
 let cache: {
   fetchedAt: number;
@@ -61,17 +61,10 @@ function pickFallbackTag(preferredTag: string, tags: DockerHubTag[]) {
     return prefixMatches.sort(sortByUpdateDesc)[0]?.name;
   }
 
+  // For quarterly tags (e.g. "2025.q3"), never fall back to a different
+  // quarter — that would silently resolve to the wrong version.
   if (preferredTag.includes(".q")) {
-    const sameYearPrefix = preferredTag.slice(0, 4);
-    const sameYearQuarterly = tags.filter(
-      (tag) =>
-        tag.name.startsWith(`${sameYearPrefix}.q`) &&
-        !tag.name.includes("nightly"),
-    );
-
-    if (sameYearQuarterly.length > 0) {
-      return sameYearQuarterly.sort(sortByUpdateDesc)[0]?.name;
-    }
+    return undefined;
   }
 
   const ltsTag = tags.find((tag) => tag.name.includes("-lts"));
