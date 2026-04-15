@@ -546,7 +546,17 @@ function HomePage() {
               </button>
 
               {createTestRunMutation.isError ? (
-                <div className="alert alert-error">Failed to queue test.</div>
+                <div
+                  className={`alert ${
+                    createTestRunMutation.error?.message === "container_already_active"
+                      ? "alert-info"
+                      : "alert-error"
+                  }`}
+                >
+                  {createTestRunMutation.error?.message === "container_already_active"
+                    ? "A container is already running. Kill it or wait for it to finish before starting a new test."
+                    : "Failed to queue test."}
+                </div>
               ) : null}
             </div>
           </div>

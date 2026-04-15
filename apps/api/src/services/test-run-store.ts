@@ -208,6 +208,16 @@ export class SqliteTestRunStore {
     return rows.map(mapRowToRecord);
   }
 
+  listStaleRuns() {
+    const rows = db
+      .query(
+        `SELECT * FROM test_runs WHERE status = 'running' OR status = 'queued'`,
+      )
+      .all() as Record<string, unknown>[];
+
+    return rows.map(mapRowToRecord);
+  }
+
   update(id: string, patch: Partial<TestRunRecord>) {
     const existing = this.getById(id);
 

@@ -32,6 +32,30 @@ export const LIFERAY_VERSION_OPTIONS: LiferayVersionOption[] = [
     track: "quarterly",
   },
   {
+    key: "dxp-2024-q4",
+    label: "DXP 2024 Q4",
+    dockerTag: "2024.q4",
+    track: "quarterly",
+  },
+  {
+    key: "dxp-2024-q3",
+    label: "DXP 2024 Q3",
+    dockerTag: "2024.q3",
+    track: "quarterly",
+  },
+  {
+    key: "dxp-2024-q2",
+    label: "DXP 2024 Q2",
+    dockerTag: "2024.q2",
+    track: "quarterly",
+  },
+  {
+    key: "dxp-2024-q1",
+    label: "DXP 2024 Q1",
+    dockerTag: "2024.q1",
+    track: "quarterly",
+  },
+  {
     key: "dxp-7-4",
     label: "DXP 7.4",
     dockerTag: "7.4.13.nightly",

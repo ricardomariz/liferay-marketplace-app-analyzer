@@ -311,6 +311,22 @@ export class LiferayTestRunner {
     return true;
   }
 
+  async isContainerRunning(containerId: string): Promise<boolean> {
+    try {
+      const info = await this.docker.getContainer(containerId).inspect();
+      return info.State.Running === true;
+    } catch {
+      return false;
+    }
+  }
+
+  async hasActiveLmaContainer(): Promise<boolean> {
+    const containers = await this.docker.listContainers({
+      filters: JSON.stringify({ name: ["lma-test-"] }),
+    });
+    return containers.length > 0;
+  }
+
   private getRemainingRuntimeMs(runtimeDeadlineIso: string) {
     const remaining = new Date(runtimeDeadlineIso).getTime() - Date.now();
 

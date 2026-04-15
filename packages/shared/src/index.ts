@@ -1,4 +1,4 @@
-export type TestRunStatus = "queued" | "running" | "success" | "failed" | "error";
+export type TestRunStatus = "queued" | "running" | "success" | "failed" | "error" | "unknown";
 
 export interface LiferayVersionOption {
   key: string;

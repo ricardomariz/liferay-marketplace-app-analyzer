@@ -416,6 +416,14 @@ button {
 .status-error::before {
   background: var(--warning);
 }
+.status-unknown {
+  background: rgba(148, 163, 184, 0.08);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+.status-unknown::before {
+  background: #94a3b8;
+}
 
 @keyframes dot-pulse {
   0%,

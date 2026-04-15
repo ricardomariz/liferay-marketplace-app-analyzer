@@ -10,6 +10,9 @@ import {
   requestKillTestRun,
 } from "../services/test-run-processor";
 import { testRunStore } from "../services/test-run-store";
+import { LiferayTestRunner } from "../services/test-runner";
+
+const runner = new LiferayTestRunner();
 
 export const testRunsRoute = new Hono();
 
@@ -180,6 +183,12 @@ testRunsRoute.post("/test-runs", async (c) => {
 
   if (!version) {
     return c.json({ error: "invalid_version" }, 400);
+  }
+
+  const hasActiveContainer = await runner.hasActiveLmaContainer();
+
+  if (hasActiveContainer) {
+    return c.json({ error: "container_already_active" }, 409);
   }
 
   if (dockerTagOverrideRaw && !/^[a-zA-Z0-9._-]+$/.test(dockerTagOverrideRaw)) {

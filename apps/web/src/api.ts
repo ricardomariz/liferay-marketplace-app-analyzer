@@ -11,7 +11,7 @@ export type TestRunRecord = {
   versionKey: string;
   dockerTag: string;
   keepAlive: boolean;
-  status: "queued" | "running" | "success" | "failed" | "error";
+  status: "queued" | "running" | "success" | "failed" | "error" | "unknown";
   phase: string;
   resultSummary: string | null;
   deployEvidence: {
@@ -78,7 +78,16 @@ export async function createTestRun(input: {
   });
 
   if (!response.ok) {
-    const errorPayload = await response.json().catch(() => ({}));
+    const errorPayload = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
+
+    if (response.status === 409 && errorPayload.error === "container_already_active") {
+      const err = new Error("container_already_active");
+      err.name = "ContainerAlreadyActiveError";
+      throw err;
+    }
+
     throw new Error(
       `Failed to create test run: ${JSON.stringify(errorPayload)}`,
     );

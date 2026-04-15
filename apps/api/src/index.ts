@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { healthRoute } from "./routes/health";
 import { testRunsRoute } from "./routes/test-runs";
 import { versionsRoute } from "./routes/versions";
+import { recoverStaleRuns } from "./services/startup-recovery";
 
 const app = new Hono();
 
@@ -21,6 +22,10 @@ app.route("/api", versionsRoute);
 app.route("/api", testRunsRoute);
 
 const port = Number(process.env.PORT ?? 3001);
+
+recoverStaleRuns().catch((err) => {
+  console.error("[startup-recovery] Recovery failed:", err);
+});
 
 serve(
   {
