@@ -639,6 +639,13 @@ button {
   overflow: hidden;
 }
 
+.file-name-cell > span:not(.test-count-chip) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .expand-btn {
   flex-shrink: 0;
   background: none;

@@ -851,7 +851,10 @@ function HomePage() {
                     <tbody>
                       {paginatedGroups.map((group) => (
                         <>
-                          <tr key={group.fileName} className="history-row-group">
+                          <tr
+                            key={group.fileName}
+                            className="history-row-group"
+                          >
                             <td className="file-name">
                               <div className="file-name-cell">
                                 {group.rest.length > 0 ? (
@@ -914,10 +917,7 @@ function HomePage() {
                           </tr>
                           {expandedFiles.has(group.fileName)
                             ? group.rest.map((item) => (
-                                <tr
-                                  key={item.id}
-                                  className="history-row-sub"
-                                >
+                                <tr key={item.id} className="history-row-sub">
                                   <td className="file-name">
                                     <div className="file-name-cell">
                                       <span className="expand-btn-spacer" />
