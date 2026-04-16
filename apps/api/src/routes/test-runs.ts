@@ -9,6 +9,7 @@ import {
   getQueueSize,
   requestKillTestRun,
 } from "../services/test-run-processor";
+import { resolveLiferayDockerTag } from "../services/docker-hub";
 import { testRunStore } from "../services/test-run-store";
 import { LiferayTestRunner } from "../services/test-runner";
 
@@ -234,7 +235,10 @@ testRunsRoute.post("/test-runs", async (c) => {
     fileSize: file.size,
     filePath: storedFilePath,
     versionKey: version.key,
-    dockerTag: dockerTagOverrideRaw || version.dockerTag,
+    dockerTag:
+      dockerTagOverrideRaw ||
+      (await resolveLiferayDockerTag(version.dockerTag)) ||
+      version.dockerTag,
     keepAlive,
     status: "queued",
     phase: "queued",

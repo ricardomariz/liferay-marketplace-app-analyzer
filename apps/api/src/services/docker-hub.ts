@@ -265,6 +265,8 @@ export async function resolveLiferayVersionOptions(
 }
 
 export async function resolveLiferayDockerTag(preferredTag: string) {
-  const tags = await listLiferayDxpDockerHubTags();
+  const tags = preferredTag.includes(".q")
+    ? await fetchTagsForPrefix(preferredTag)
+    : await listLiferayDxpDockerHubTags();
   return pickFallbackTag(preferredTag, tags);
 }
