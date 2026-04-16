@@ -24,6 +24,15 @@ const STATUS_OPTIONS: Array<
   "queued" | "running" | "success" | "failed" | "error"
 > = ["queued", "running", "success", "failed", "error"];
 
+const HISTORY_PAGE_SIZE = 20;
+
+type GroupedFileRun = {
+  fileName: string;
+  latest: TestRunRecord;
+  rest: TestRunRecord[];
+  totalCount: number;
+};
+
 function isTerminalStatus(status: TestRunRecord["status"]) {
   return status === "success" || status === "failed" || status === "error";
 }
@@ -289,6 +298,8 @@ function HomePage() {
   const [historyStatus, setHistoryStatus] = useState<
     "" | "queued" | "running" | "success" | "failed" | "error"
   >("");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
 
   const versionsQuery = useQuery({
     queryKey: ["versions"],
@@ -413,6 +424,56 @@ function HomePage() {
     !!historyCreatedTo ||
     !!historyStatus;
 
+  const groupedHistory = useMemo((): GroupedFileRun[] => {
+    const items = historyQuery.data?.items ?? [];
+    const map = new Map<string, TestRunRecord[]>();
+
+    for (const item of items) {
+      const existing = map.get(item.fileName);
+
+      if (existing) {
+        existing.push(item);
+      } else {
+        map.set(item.fileName, [item]);
+      }
+    }
+
+    return [...map.entries()].map(([fileName, runs]) => ({
+      fileName,
+      latest: runs[0]!,
+      rest: runs.slice(1),
+      totalCount: runs.length,
+    }));
+  }, [historyQuery.data]);
+
+  const totalHistoryPages = Math.max(
+    1,
+    Math.ceil(groupedHistory.length / HISTORY_PAGE_SIZE),
+  );
+
+  const paginatedGroups = useMemo(
+    () =>
+      groupedHistory.slice(
+        (historyPage - 1) * HISTORY_PAGE_SIZE,
+        historyPage * HISTORY_PAGE_SIZE,
+      ),
+    [groupedHistory, historyPage],
+  );
+
+  const toggleFileExpand = (fileName: string) => {
+    setExpandedFiles((prev) => {
+      const next = new Set(prev);
+
+      if (next.has(fileName)) {
+        next.delete(fileName);
+      } else {
+        next.add(fileName);
+      }
+
+      return next;
+    });
+  };
+
   const activeFilterChips = [
     historyFileName ? `File: ${historyFileName}` : null,
     historyStatus ? `Status: ${historyStatus}` : null,
@@ -441,6 +502,8 @@ function HomePage() {
     setHistoryCreatedFrom("");
     setHistoryCreatedTo("");
     setHistoryStatus("");
+    setHistoryPage(1);
+    setExpandedFiles(new Set());
   };
 
   return (
@@ -707,7 +770,10 @@ function HomePage() {
                   type="text"
                   placeholder="e.g. my-app"
                   value={historyFileName}
-                  onChange={(event) => setHistoryFileName(event.target.value)}
+                  onChange={(event) => {
+                    setHistoryFileName(event.target.value);
+                    setHistoryPage(1);
+                  }}
                 />
               </div>
               <div className="field" style={{ marginBottom: 0 }}>
@@ -715,7 +781,7 @@ function HomePage() {
                 <select
                   id="h-status"
                   value={historyStatus}
-                  onChange={(event) =>
+                  onChange={(event) => {
                     setHistoryStatus(
                       event.target.value as
                         | ""
@@ -724,8 +790,9 @@ function HomePage() {
                         | "success"
                         | "failed"
                         | "error",
-                    )
-                  }
+                    );
+                    setHistoryPage(1);
+                  }}
                 >
                   <option value="">All</option>
                   {STATUS_OPTIONS.map((s) => (
@@ -741,9 +808,10 @@ function HomePage() {
                   id="h-from"
                   type="date"
                   value={historyCreatedFrom}
-                  onChange={(event) =>
-                    setHistoryCreatedFrom(event.target.value)
-                  }
+                  onChange={(event) => {
+                    setHistoryCreatedFrom(event.target.value);
+                    setHistoryPage(1);
+                  }}
                 />
               </div>
               <div className="field" style={{ marginBottom: 0 }}>
@@ -752,7 +820,10 @@ function HomePage() {
                   id="h-to"
                   type="date"
                   value={historyCreatedTo}
-                  onChange={(event) => setHistoryCreatedTo(event.target.value)}
+                  onChange={(event) => {
+                    setHistoryCreatedTo(event.target.value);
+                    setHistoryPage(1);
+                  }}
                 />
               </div>
             </div>
@@ -765,45 +836,156 @@ function HomePage() {
             ) : null}
 
             {!historyQuery.isLoading && !historyQuery.isError ? (
-              historyQuery.data?.items.length ? (
-                <table className="history-table">
-                  <thead>
-                    <tr>
-                      <th>File</th>
-                      <th>Version</th>
-                      <th>Status</th>
-                      <th>Date</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historyQuery.data.items.map((item) => (
-                      <tr key={item.id}>
-                        <td className="file-name">{item.fileName}</td>
-                        <td>
-                          <span className="version-tag">{item.versionKey}</span>
-                          <span
-                            className="version-tag"
-                            style={{ marginLeft: 6, opacity: 0.5 }}
-                          >
-                            ({item.dockerTag})
-                          </span>
-                        </td>
-                        <td>
-                          <StatusBadge status={item.status} />
-                        </td>
-                        <td style={{ whiteSpace: "nowrap" }}>
-                          {new Date(item.createdAt).toLocaleString()}
-                        </td>
-                        <td className="action-cell">
-                          <Link className="link" to={`/test-runs/${item.id}`}>
-                            Details →
-                          </Link>
-                        </td>
+              paginatedGroups.length ? (
+                <>
+                  <table className="history-table">
+                    <thead>
+                      <tr>
+                        <th>File</th>
+                        <th>Version</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th />
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {paginatedGroups.map((group) => (
+                        <>
+                          <tr key={group.fileName} className="history-row-group">
+                            <td className="file-name">
+                              <div className="file-name-cell">
+                                {group.rest.length > 0 ? (
+                                  <button
+                                    type="button"
+                                    className="expand-btn"
+                                    onClick={() =>
+                                      toggleFileExpand(group.fileName)
+                                    }
+                                    aria-label={
+                                      expandedFiles.has(group.fileName)
+                                        ? "Collapse"
+                                        : "Expand"
+                                    }
+                                  >
+                                    {expandedFiles.has(group.fileName)
+                                      ? "▾"
+                                      : "▸"}
+                                  </button>
+                                ) : (
+                                  <span className="expand-btn-spacer" />
+                                )}
+                                <span title={group.fileName}>
+                                  {group.fileName}
+                                </span>
+                                {group.totalCount > 1 ? (
+                                  <span className="test-count-chip">
+                                    {group.totalCount}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td>
+                              <span className="version-tag">
+                                {group.latest.versionKey}
+                              </span>
+                              <span
+                                className="version-tag"
+                                style={{ marginLeft: 6, opacity: 0.5 }}
+                              >
+                                ({group.latest.dockerTag})
+                              </span>
+                            </td>
+                            <td>
+                              <StatusBadge status={group.latest.status} />
+                            </td>
+                            <td style={{ whiteSpace: "nowrap" }}>
+                              {new Date(
+                                group.latest.createdAt,
+                              ).toLocaleString()}
+                            </td>
+                            <td className="action-cell">
+                              <Link
+                                className="link"
+                                to={`/test-runs/${group.latest.id}`}
+                              >
+                                Details →
+                              </Link>
+                            </td>
+                          </tr>
+                          {expandedFiles.has(group.fileName)
+                            ? group.rest.map((item) => (
+                                <tr
+                                  key={item.id}
+                                  className="history-row-sub"
+                                >
+                                  <td className="file-name">
+                                    <div className="file-name-cell">
+                                      <span className="expand-btn-spacer" />
+                                      <span
+                                        className="sub-row-label"
+                                        title={item.createdAt}
+                                      >
+                                        Previous run
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <span className="version-tag">
+                                      {item.versionKey}
+                                    </span>
+                                    <span
+                                      className="version-tag"
+                                      style={{ marginLeft: 6, opacity: 0.5 }}
+                                    >
+                                      ({item.dockerTag})
+                                    </span>
+                                  </td>
+                                  <td>
+                                    <StatusBadge status={item.status} />
+                                  </td>
+                                  <td style={{ whiteSpace: "nowrap" }}>
+                                    {new Date(item.createdAt).toLocaleString()}
+                                  </td>
+                                  <td className="action-cell">
+                                    <Link
+                                      className="link"
+                                      to={`/test-runs/${item.id}`}
+                                    >
+                                      Details →
+                                    </Link>
+                                  </td>
+                                </tr>
+                              ))
+                            : null}
+                        </>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {totalHistoryPages > 1 ? (
+                    <div className="pagination-bar">
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        disabled={historyPage <= 1}
+                        onClick={() => setHistoryPage((p) => p - 1)}
+                      >
+                        ← Prev
+                      </button>
+                      <span className="pagination-label">
+                        Page {historyPage} of {totalHistoryPages}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        disabled={historyPage >= totalHistoryPages}
+                        onClick={() => setHistoryPage((p) => p + 1)}
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  ) : null}
+                </>
               ) : (
                 <p className="empty-state">
                   No tests found for the selected filters.
