@@ -50,28 +50,47 @@ function matchesPreferredPrefix(tagName: string, preferredTag: string) {
 // e.g. "2025.q3.12" ✓   "2025.q3.12-d10.0.3-20260212101814" ✗
 const CLEAN_QUARTERLY_TAG_RE = /^\d{4}\.q\d+\.(\d+)$/i;
 
+// Matches LTS quarterly patch tags: YYYY.qN.NUMBER-lts
+// e.g. "2025.q3.12-lts" ✓
+const LTS_QUARTERLY_TAG_RE = /^\d{4}\.q\d+\.(\d+)-lts$/i;
+
 function pickBestQuarterlyTag(
   preferredTag: string,
   tags: DockerHubTag[],
 ): string | undefined {
-  const cleanMatches = tags.filter(
+  const ltsMatches = tags.filter(
+    (tag) =>
+      tag.name.startsWith(`${preferredTag}.`) &&
+      LTS_QUARTERLY_TAG_RE.test(tag.name),
+  );
+
+  if (ltsMatches.length > 0) {
+    ltsMatches.sort((a, b) => {
+      const patchA = Number(LTS_QUARTERLY_TAG_RE.exec(a.name)?.[1] ?? 0);
+      const patchB = Number(LTS_QUARTERLY_TAG_RE.exec(b.name)?.[1] ?? 0);
+      return patchB - patchA;
+    });
+
+    return ltsMatches[0]?.name;
+  }
+
+  const plainMatches = tags.filter(
     (tag) =>
       tag.name.startsWith(`${preferredTag}.`) &&
       CLEAN_QUARTERLY_TAG_RE.test(tag.name),
   );
 
-  if (cleanMatches.length === 0) {
+  if (plainMatches.length === 0) {
     return undefined;
   }
 
-  // Sort by patch number descending (numeric, not lexicographic).
-  cleanMatches.sort((a, b) => {
+  plainMatches.sort((a, b) => {
     const patchA = Number(CLEAN_QUARTERLY_TAG_RE.exec(a.name)?.[1] ?? 0);
     const patchB = Number(CLEAN_QUARTERLY_TAG_RE.exec(b.name)?.[1] ?? 0);
     return patchB - patchA;
   });
 
-  return cleanMatches[0]?.name;
+  return plainMatches[0]?.name;
 }
 
 function pickFallbackTag(preferredTag: string, tags: DockerHubTag[]) {
