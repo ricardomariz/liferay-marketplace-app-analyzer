@@ -9,16 +9,20 @@ import {
   useParams,
 } from "react-router-dom";
 import {
+  clearAuthToken,
   createTestRun,
   fetchDockerTags,
   fetchVersions,
+  getAuthToken,
   getTestRun,
   killTestRun,
   listActiveContainers,
   listTestRuns,
+  setAuthToken,
   subscribeToTestRunEvents,
   type TestRunRecord,
 } from "./api";
+import { LoginPage } from "./LoginPage";
 
 const STATUS_OPTIONS: Array<
   "queued" | "running" | "success" | "failed" | "error"
@@ -266,6 +270,11 @@ function FailurePanel({
 }
 
 function AppTopbar({ breadcrumb }: { breadcrumb?: string }) {
+  function handleLogout() {
+    clearAuthToken();
+    window.location.reload();
+  }
+
   return (
     <header className="topbar">
       <Link to="/" className="topbar-logo">
@@ -280,6 +289,22 @@ function AppTopbar({ breadcrumb }: { breadcrumb?: string }) {
       ) : null}
       <div className="topbar-spacer" />
       <span className="topbar-badge">Liferay DXP</span>
+      <button
+        onClick={handleLogout}
+        style={{
+          marginLeft: "0.75rem",
+          background: "none",
+          border: "1px solid rgba(255,255,255,0.35)",
+          color: "inherit",
+          borderRadius: 6,
+          padding: "0.25rem 0.75rem",
+          cursor: "pointer",
+          fontSize: "0.8rem",
+          opacity: 0.85,
+        }}
+      >
+        Logout
+      </button>
     </header>
   );
 }
@@ -1247,6 +1272,17 @@ function TestRunDetailsPage() {
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 export function App() {
+  const [token, setToken] = useState<string | null>(getAuthToken);
+
+  function handleLogin(newToken: string) {
+    setAuthToken(newToken);
+    setToken(newToken);
+  }
+
+  if (!token) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />

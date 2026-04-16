@@ -1,6 +1,8 @@
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
+import { jwt } from "hono/jwt";
 import { Hono } from "hono";
+import { authRoute } from "./routes/auth";
 import { healthRoute } from "./routes/health";
 import { testRunsRoute } from "./routes/test-runs";
 import { versionsRoute } from "./routes/versions";
@@ -17,7 +19,24 @@ app.get("/", (c) =>
   }),
 );
 
+// Public routes — no auth required
+app.route("/api", authRoute);
 app.route("/api", healthRoute);
+
+// JWT guard for all other /api/* routes.
+// Also accepts ?token= query param for EventSource (SSE) connections.
+app.use("/api/*", async (c, next) => {
+  const secret = process.env.AUTH_SECRET ?? "change-me";
+
+  // Allow token via query param for SSE routes that can't set headers.
+  const queryToken = c.req.query("token");
+  if (queryToken) {
+    c.req.raw.headers.set("Authorization", `Bearer ${queryToken}`);
+  }
+
+  return jwt({ secret, alg: "HS256" })(c, next);
+});
+
 app.route("/api", versionsRoute);
 app.route("/api", testRunsRoute);
 

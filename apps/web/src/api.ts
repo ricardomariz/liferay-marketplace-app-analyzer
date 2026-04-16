@@ -2,6 +2,44 @@ import type { LiferayVersionOption, VersionsResponse } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3001";
 
+const TOKEN_KEY = "auth_token";
+
+export function getAuthToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setAuthToken(token: string) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearAuthToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+function authHeaders(extra?: HeadersInit): HeadersInit {
+  const token = getAuthToken();
+  return token
+    ? { Authorization: `Bearer ${token}`, ...(extra as object) }
+    : { ...(extra as object) };
+}
+
+async function authFetch(
+  input: string | URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  const response = await fetch(input, {
+    ...init,
+    headers: { ...authHeaders(init.headers as HeadersInit) },
+  });
+
+  if (response.status === 401) {
+    clearAuthToken();
+    window.location.reload();
+  }
+
+  return response;
+}
+
 export type TestRunRecord = {
   id: string;
   userId: string;
@@ -47,7 +85,7 @@ export type DockerTagOption = {
 };
 
 export async function fetchVersions(): Promise<LiferayVersionOption[]> {
-  const response = await fetch(`${API_BASE_URL}/api/versions`);
+  const response = await authFetch(`${API_BASE_URL}/api/versions`);
 
   if (!response.ok) {
     throw new Error("Failed to fetch versions");
@@ -72,7 +110,7 @@ export async function createTestRun(input: {
     formData.append("dockerTag", input.dockerTag);
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/test-runs`, {
+  const response = await authFetch(`${API_BASE_URL}/api/test-runs`, {
     method: "POST",
     body: formData,
   });
@@ -107,7 +145,7 @@ export async function fetchDockerTags(
 ): Promise<DockerTagOption[]> {
   const url = new URL(`${API_BASE_URL}/api/versions/tags`);
   if (prefix) url.searchParams.set("prefix", prefix);
-  const response = await fetch(url.toString());
+  const response = await authFetch(url.toString());
 
   if (!response.ok) {
     throw new Error("Failed to fetch Docker tags");
@@ -121,7 +159,7 @@ export async function fetchDockerTags(
 }
 
 export async function getTestRun(id: string): Promise<TestRunRecord> {
-  const response = await fetch(`${API_BASE_URL}/api/test-runs/${id}`);
+  const response = await authFetch(`${API_BASE_URL}/api/test-runs/${id}`);
 
   if (!response.ok) {
     throw new Error("Failed to load test run");
@@ -151,7 +189,7 @@ export async function listTestRuns(filters: TestRunHistoryFilters = {}) {
 
   const query = params.toString();
   const suffix = query ? `?${query}` : "";
-  const response = await fetch(`${API_BASE_URL}/api/test-runs${suffix}`);
+  const response = await authFetch(`${API_BASE_URL}/api/test-runs${suffix}`);
 
   if (!response.ok) {
     throw new Error("Failed to list test runs");
@@ -170,9 +208,11 @@ export function subscribeToTestRunEvents(
     onError?: () => void;
   },
 ) {
-  const eventSource = new EventSource(
-    `${API_BASE_URL}/api/test-runs/${id}/events`,
-  );
+  const token = getAuthToken();
+  const url = new URL(`${API_BASE_URL}/api/test-runs/${id}/events`);
+  if (token) url.searchParams.set("token", token);
+
+  const eventSource = new EventSource(url.toString());
 
   const processMessage = (event: MessageEvent) => {
     try {
@@ -196,7 +236,7 @@ export function subscribeToTestRunEvents(
 }
 
 export async function killTestRun(id: string) {
-  const response = await fetch(`${API_BASE_URL}/api/test-runs/${id}/kill`, {
+  const response = await authFetch(`${API_BASE_URL}/api/test-runs/${id}/kill`, {
     method: "POST",
   });
 
@@ -211,7 +251,7 @@ export async function killTestRun(id: string) {
 }
 
 export async function listActiveContainers() {
-  const response = await fetch(
+  const response = await authFetch(
     `${API_BASE_URL}/api/test-runs-active-containers`,
   );
 
