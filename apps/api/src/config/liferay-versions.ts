@@ -55,12 +55,6 @@ export const LIFERAY_VERSION_OPTIONS: LiferayVersionOption[] = [
     dockerTag: "2024.q1",
     track: "quarterly",
   },
-  {
-    key: "dxp-7-4",
-    label: "DXP 7.4",
-    dockerTag: "7.4.13.nightly",
-    track: "ga",
-  },
 ];
 
 export function getLiferayVersionByKey(key: string) {

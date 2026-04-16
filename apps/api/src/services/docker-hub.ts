@@ -46,11 +46,51 @@ function matchesPreferredPrefix(tagName: string, preferredTag: string) {
   );
 }
 
+// Matches only clean quarterly patch tags: YYYY.qN.NUMBER with nothing after.
+// e.g. "2025.q3.12" ✓   "2025.q3.12-d10.0.3-20260212101814" ✗
+const CLEAN_QUARTERLY_TAG_RE = /^\d{4}\.q\d+\.(\d+)$/i;
+
+function pickBestQuarterlyTag(
+  preferredTag: string,
+  tags: DockerHubTag[],
+): string | undefined {
+  const cleanMatches = tags.filter(
+    (tag) =>
+      tag.name.startsWith(`${preferredTag}.`) &&
+      CLEAN_QUARTERLY_TAG_RE.test(tag.name),
+  );
+
+  if (cleanMatches.length === 0) {
+    return undefined;
+  }
+
+  // Sort by patch number descending (numeric, not lexicographic).
+  cleanMatches.sort((a, b) => {
+    const patchA = Number(CLEAN_QUARTERLY_TAG_RE.exec(a.name)?.[1] ?? 0);
+    const patchB = Number(CLEAN_QUARTERLY_TAG_RE.exec(b.name)?.[1] ?? 0);
+    return patchB - patchA;
+  });
+
+  return cleanMatches[0]?.name;
+}
+
 function pickFallbackTag(preferredTag: string, tags: DockerHubTag[]) {
   const direct = tags.find((tag) => tag.name === preferredTag);
 
   if (direct) {
     return direct.name;
+  }
+
+  // For quarterly tags, pick the highest clean patch version (no suffix).
+  // Fall back to YYYY.qN.0 if nothing is found.
+  if (preferredTag.includes(".q")) {
+    const best = pickBestQuarterlyTag(preferredTag, tags);
+    if (best) {
+      return best;
+    }
+
+    const dotZeroTag = `${preferredTag}.0`;
+    return tags.find((tag) => tag.name === dotZeroTag)?.name ?? dotZeroTag;
   }
 
   const prefixMatches = tags.filter((tag) =>
@@ -59,15 +99,6 @@ function pickFallbackTag(preferredTag: string, tags: DockerHubTag[]) {
 
   if (prefixMatches.length > 0) {
     return prefixMatches.sort(sortByUpdateDesc)[0]?.name;
-  }
-
-  // For quarterly tags (e.g. "2025.q2"), never fall back to a different
-  // quarter — that would silently resolve to the wrong version.
-  // Try appending ".0" as a last resort (e.g. "2025.q2.0").
-  if (preferredTag.includes(".q")) {
-    const dotZeroTag = `${preferredTag}.0`;
-    const dotZeroMatch = tags.find((tag) => tag.name === dotZeroTag);
-    return dotZeroMatch ? dotZeroMatch.name : dotZeroTag;
   }
 
   const ltsTag = tags.find((tag) => tag.name.includes("-lts"));
