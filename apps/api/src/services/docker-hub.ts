@@ -227,6 +227,8 @@ export async function listLiferayDxpDockerHubTags() {
   return tags;
 }
 
+export { fetchTagsForPrefix };
+
 export async function listLiferayDockerTagOptions(limit = 120) {
   const tags = await listLiferayDxpDockerHubTags();
 

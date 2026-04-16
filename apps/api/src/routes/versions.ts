@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { LIFERAY_VERSION_OPTIONS } from "../config/liferay-versions";
 import {
+  fetchTagsForPrefix,
   listLiferayDockerTagOptions,
   resolveLiferayVersionOptions,
 } from "../services/docker-hub";
@@ -40,15 +41,21 @@ versionsRoute.get("/versions", async (c) => {
 });
 
 versionsRoute.get("/versions/tags", async (c) => {
-  try {
-    const tags = await listLiferayDockerTagOptions();
+  const prefix = c.req.query("prefix")?.trim() ?? "";
 
-    return c.json({
-      tags,
-    });
+  try {
+    if (prefix) {
+      const raw = await fetchTagsForPrefix(prefix);
+      const tags = raw.map((tag) => ({
+        name: tag.name,
+        lastUpdated: tag.last_updated,
+      }));
+      return c.json({ tags });
+    }
+
+    const tags = await listLiferayDockerTagOptions();
+    return c.json({ tags });
   } catch {
-    return c.json({
-      tags: [],
-    });
+    return c.json({ tags: [] });
   }
 });

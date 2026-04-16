@@ -82,7 +82,10 @@ export async function createTestRun(input: {
       error?: string;
     };
 
-    if (response.status === 409 && errorPayload.error === "container_already_active") {
+    if (
+      response.status === 409 &&
+      errorPayload.error === "container_already_active"
+    ) {
       const err = new Error("container_already_active");
       err.name = "ContainerAlreadyActiveError";
       throw err;
@@ -99,8 +102,12 @@ export async function createTestRun(input: {
   }>;
 }
 
-export async function fetchDockerTags(): Promise<DockerTagOption[]> {
-  const response = await fetch(`${API_BASE_URL}/api/versions/tags`);
+export async function fetchDockerTags(
+  prefix?: string,
+): Promise<DockerTagOption[]> {
+  const url = new URL(`${API_BASE_URL}/api/versions/tags`);
+  if (prefix) url.searchParams.set("prefix", prefix);
+  const response = await fetch(url.toString());
 
   if (!response.ok) {
     throw new Error("Failed to fetch Docker tags");

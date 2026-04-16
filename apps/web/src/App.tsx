@@ -306,9 +306,23 @@ function HomePage() {
     queryFn: fetchVersions,
   });
 
+  const selectedVersionOption = useMemo(
+    () =>
+      versionsQuery.data?.find((version) => version.key === selectedVersion),
+    [selectedVersion, versionsQuery.data],
+  );
+
+  const selectedVersionPrefix = useMemo(() => {
+    const source = selectedVersionOption?.dockerTag ?? "";
+    const match = source.match(/^(\d{4}\.q\d+)/i);
+
+    return match?.[1] ?? source;
+  }, [selectedVersionOption]);
+
   const dockerTagsQuery = useQuery({
-    queryKey: ["docker-tags"],
-    queryFn: fetchDockerTags,
+    queryKey: ["docker-tags", selectedVersionPrefix],
+    queryFn: () => fetchDockerTags(selectedVersionPrefix || undefined),
+    enabled: !!selectedVersionPrefix,
   });
 
   const createTestRunMutation = useMutation({
@@ -379,44 +393,9 @@ function HomePage() {
   const canSubmit =
     !!selectedVersion && !!selectedFile && !createTestRunMutation.isPending;
 
-  const selectedVersionOption = useMemo(
-    () =>
-      versionsQuery.data?.find((version) => version.key === selectedVersion),
-    [selectedVersion, versionsQuery.data],
-  );
-
-  const selectedVersionPrefix = useMemo(() => {
-    const source = selectedVersionOption?.dockerTag ?? "";
-    const match = source.match(/^(\d{4}\.q\d+)/i);
-
-    return match?.[1] ?? source;
-  }, [selectedVersionOption]);
-
   const filteredDockerTagOptions = useMemo(() => {
-    const tags = dockerTagsQuery.data ?? [];
-
-    if (!selectedVersionPrefix) {
-      return tags.slice(0, 80);
-    }
-
-    const stronglyRelated = tags.filter((tag) =>
-      tag.name.startsWith(selectedVersionPrefix),
-    );
-
-    if (stronglyRelated.length > 0) {
-      return stronglyRelated.slice(0, 80);
-    }
-
-    const yearlyRelated = tags.filter((tag) =>
-      tag.name.startsWith(selectedVersionPrefix.slice(0, 4)),
-    );
-
-    if (yearlyRelated.length > 0) {
-      return yearlyRelated.slice(0, 80);
-    }
-
-    return tags.slice(0, 80);
-  }, [dockerTagsQuery.data, selectedVersionPrefix]);
+    return (dockerTagsQuery.data ?? []).slice(0, 80);
+  }, [dockerTagsQuery.data]);
 
   const hasActiveHistoryFilters =
     !!historyFileName ||
