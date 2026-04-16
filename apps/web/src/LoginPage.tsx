@@ -39,121 +39,51 @@ export function LoginPage({ onLogin }: Props) {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#f4f5f7",
-      }}
-    >
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          background: "#fff",
-          borderRadius: 8,
-          padding: "2.5rem 2rem",
-          width: 340,
-          boxShadow: "0 2px 16px rgba(0,0,0,0.10)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "1.25rem",
-        }}
-      >
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "1.25rem",
-            fontWeight: 700,
-            textAlign: "center",
-            color: "#1a1a2e",
-          }}
-        >
-          Marketplace App Analyzer
-        </h1>
-
-        <div
-          style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}
-        >
-          <label
-            htmlFor="username"
-            style={{ fontSize: "0.875rem", fontWeight: 600 }}
-          >
-            Username
-          </label>
-          <input
-            id="username"
-            type="text"
-            autoComplete="username"
-            required
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            style={{
-              padding: "0.5rem 0.75rem",
-              border: "1px solid #d1d5db",
-              borderRadius: 6,
-              fontSize: "0.95rem",
-            }}
-          />
+    <div className="login-page">
+      <div className="login-card card">
+        <div className="login-card-header">
+          <div className="topbar-logo-icon">L</div>
+          <span className="login-title">App Analyzer</span>
         </div>
 
-        <div
-          style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}
-        >
-          <label
-            htmlFor="password"
-            style={{ fontSize: "0.875rem", fontWeight: 600 }}
-          >
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{
-              padding: "0.5rem 0.75rem",
-              border: "1px solid #d1d5db",
-              borderRadius: 6,
-              fontSize: "0.95rem",
-            }}
-          />
+        <div className="login-card-body card-body">
+          <form onSubmit={handleSubmit} className="login-form">
+            <div className="field">
+              <label htmlFor="username">Username</label>
+              <input
+                id="username"
+                type="text"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            {error && <p className="login-error">{error}</p>}
+
+            <button
+              type="submit"
+              className="btn-primary login-submit"
+              disabled={loading}
+            >
+              {loading ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
         </div>
-
-        {error && (
-          <p
-            style={{
-              margin: 0,
-              color: "#dc2626",
-              fontSize: "0.875rem",
-              textAlign: "center",
-            }}
-          >
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            padding: "0.6rem 0",
-            background: "#1a1a2e",
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            fontWeight: 600,
-            fontSize: "0.95rem",
-            cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
-          {loading ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
+      </div>
     </div>
   );
 }
