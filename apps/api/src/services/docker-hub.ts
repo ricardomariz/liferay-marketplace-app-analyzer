@@ -19,11 +19,17 @@ const DOCKER_HUB_BASE_TAGS_URL =
   "https://hub.docker.com/v2/repositories/liferay/dxp/tags?page_size=100";
 const CACHE_TTL_MS = 5 * 60_000;
 const MAX_TAG_PAGES = 10;
+const MAX_PREFIX_PAGES = 2;
 
 let cache: {
   fetchedAt: number;
   tags: DockerHubTag[];
 } | null = null;
+
+const prefixCache = new Map<
+  string,
+  { fetchedAt: number; tags: DockerHubTag[] }
+>();
 
 function toMillis(value: string | undefined) {
   if (!value) {
@@ -129,6 +135,52 @@ function pickFallbackTag(preferredTag: string, tags: DockerHubTag[]) {
   return tags[0]?.name;
 }
 
+async function fetchTagsForPrefix(prefix: string): Promise<DockerHubTag[]> {
+  const cached = prefixCache.get(prefix);
+
+  if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
+    return cached.tags;
+  }
+
+  const baseUrl = `https://hub.docker.com/v2/repositories/liferay/dxp/tags?page_size=100&name=${encodeURIComponent(prefix)}`;
+  let nextUrl: string | null | undefined = baseUrl;
+  let page = 0;
+  const collected: DockerHubTag[] = [];
+
+  while (nextUrl && page < MAX_PREFIX_PAGES) {
+    page += 1;
+    const response = await fetch(nextUrl);
+
+    if (!response.ok) {
+      throw new Error(`Docker Hub tags request failed with ${response.status}`);
+    }
+
+    const payload = (await response.json()) as DockerHubTagsResponse;
+
+    if (Array.isArray(payload.results)) {
+      collected.push(
+        ...payload.results.filter(
+          (tag): tag is DockerHubTag =>
+            typeof tag?.name === "string" && tag.name.length > 0,
+        ),
+      );
+    }
+
+    nextUrl = payload.next;
+  }
+
+  const uniqueTags = new Map<string, DockerHubTag>();
+
+  for (const tag of collected) {
+    uniqueTags.set(tag.name, tag);
+  }
+
+  const tags = [...uniqueTags.values()];
+  prefixCache.set(prefix, { fetchedAt: Date.now(), tags });
+
+  return tags;
+}
+
 export async function listLiferayDxpDockerHubTags() {
   if (cache && Date.now() - cache.fetchedAt < CACHE_TTL_MS) {
     return cache.tags;
@@ -190,20 +242,26 @@ export async function listLiferayDockerTagOptions(limit = 120) {
 export async function resolveLiferayVersionOptions(
   options: LiferayVersionOption[],
 ) {
-  const tags = await listLiferayDxpDockerHubTags();
+  return Promise.all(
+    options.map(async (option) => {
+      // For quarterly tags use a targeted prefix search so older quarters
+      // (e.g. 2024.q2) are not lost to the global 1000-tag page limit.
+      const tags = option.dockerTag.includes(".q")
+        ? await fetchTagsForPrefix(option.dockerTag)
+        : await listLiferayDxpDockerHubTags();
 
-  return options.map((option) => {
-    const resolvedTag = pickFallbackTag(option.dockerTag, tags);
+      const resolvedTag = pickFallbackTag(option.dockerTag, tags);
 
-    if (!resolvedTag) {
-      return option;
-    }
+      if (!resolvedTag) {
+        return option;
+      }
 
-    return {
-      ...option,
-      dockerTag: resolvedTag,
-    };
-  });
+      return {
+        ...option,
+        dockerTag: resolvedTag,
+      };
+    }),
+  );
 }
 
 export async function resolveLiferayDockerTag(preferredTag: string) {
